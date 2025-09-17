@@ -43,7 +43,12 @@ exports.signupCard = (req, res) => {
 exports.login = async (req, res) => {
   try {
     const merchant = await merchantService.login(req.body);
-    res.json({ merchant });
+    const response = {
+      id: merchant.id,
+      restaurant_name: merchant.restaurant_name,
+      restaurant_logo: merchant.restaurant_logo || null,
+    };
+    res.json(response);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
