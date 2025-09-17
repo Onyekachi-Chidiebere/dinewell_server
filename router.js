@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const express = require('express');
 const router = express.Router();
 const merchantController = require('./controllers/merchantController');
+const dishController = require('./controllers/dishController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -26,5 +27,12 @@ router.post(
 );
 router.post('/merchant/signup/card', merchantController.signupCard);
 router.post('/merchant/login', merchantController.login);
+
+// Dish management routes
+router.post('/dishes', upload.single('dishImage'), dishController.createDish);
+router.get('/dishes/:id', dishController.getDish);
+router.get('/restaurants/:restaurantId/dishes', dishController.getRestaurantDishes);
+router.put('/dishes/:id', upload.single('dishImage'), dishController.updateDish);
+router.delete('/dishes/:id', dishController.deleteDish);
 
 module.exports = router;

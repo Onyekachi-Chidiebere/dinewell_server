@@ -6,6 +6,7 @@ const { dbConnection } = require('./utils/db-connection');
 
 const router = require('./router');
 const User = require('./models/user');
+const Dish = require('./models/dish');
 
 const port = process.env.PORT;
 
@@ -21,6 +22,8 @@ app.use('/', router);
 dbConnection();
 
 User.sync({ alter: true })
+Dish.sync({ alter: true })
+
 // initalize server
 httpServer.listen(port, () => {
     console.log(`Server started at http://localhost:${port}`);
