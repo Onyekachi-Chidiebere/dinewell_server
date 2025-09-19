@@ -81,10 +81,11 @@ async function listCards({ userId }) {
   const user = await User.findByPk(userId);
   if (!user) throw new Error('User not found');
   const customerId = await ensureCustomer(user);
+  const customer = await stripe.customers.retrieve(customerId);
 
   const pms = await stripe.paymentMethods.list({ customer: customerId, type: 'card' });
   return {
-    default_payment_card_id: user.default_payment_card_id,
+    default_payment_card_id: customer.invoice_settings.default_payment_method,
     cards: pms.data.map(pm => ({
       id: pm.id,
       brand: pm.card?.brand,
