@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const merchantController = require('./controllers/merchantController');
 const dishController = require('./controllers/dishController');
+const cardController = require('./controllers/cardController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -34,5 +35,11 @@ router.get('/dishes/:id', dishController.getDish);
 router.get('/restaurants/:restaurantId/dishes', dishController.getRestaurantDishes);
 router.put('/dishes/:id', upload.single('dishImage'), dishController.updateDish);
 router.delete('/dishes/:id', dishController.deleteDish);
+
+// Card management routes (Stripe)
+router.post('/cards/add', cardController.addCard);
+router.post('/cards/default', cardController.setDefault);
+router.post('/cards/charge', cardController.charge);
+router.get('/cards', cardController.list);
 
 module.exports = router;
