@@ -102,6 +102,26 @@ User.init(
         restaurant_images: {
             type: DataTypes.JSONB,
             defaultValue: []
+        },
+        // Client-specific fields
+        username: {
+            type: DataTypes.STRING(255),
+            unique: true
+        },
+        date_of_birth: {
+            type: DataTypes.DATE
+        },
+        gender: {
+            type: DataTypes.STRING(50)
+        },
+        provider: {
+            type: DataTypes.STRING(50) // 'google', 'apple', 'email'
+        },
+        provider_id: {
+            type: DataTypes.STRING(255) // Provider's user ID
+        },
+        profile_image: {
+            type: DataTypes.STRING(500)
         }
 
     },

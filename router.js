@@ -8,6 +8,7 @@ const router = express.Router();
 const merchantController = require('./controllers/merchantController');
 const dishController = require('./controllers/dishController');
 const cardController = require('./controllers/cardController');
+const clientController = require('./controllers/clientController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -41,5 +42,13 @@ router.post('/cards/add', cardController.addCard);
 router.post('/cards/default', cardController.setDefault);
 router.post('/cards/charge', cardController.charge);
 router.get('/cards', cardController.list);
+
+// Client management routes
+router.post('/client/signup', clientController.createClient);
+router.post('/client/signin', clientController.signInClient);
+router.get('/client/profile/:userId', clientController.getClientProfile);
+router.put('/client/profile/:userId', clientController.updateClientProfile);
+router.get('/client/username/check', clientController.checkUsernameAvailability);
+router.post('/client/username/suggest', clientController.generateUsernameSuggestion);
 
 module.exports = router;
