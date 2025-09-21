@@ -36,6 +36,7 @@ exports.createClient = async (req, res) => {
       client
     });
   } catch (err) {
+    console.log({err})
     res.status(400).json({ 
       error: err.message 
     });

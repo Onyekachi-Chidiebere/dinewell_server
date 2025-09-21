@@ -27,6 +27,7 @@ async function verifyGoogleToken(idToken) {
       locale: payload.locale,
     };
   } catch (error) {
+    console.log({error})
     throw new Error(`Google token verification failed: ${error.message}`);
   }
 }

@@ -1,4 +1,4 @@
-const { User } = require('../models/user');
+const  User  = require('../models/user');
 const bcrypt = require('bcrypt');
 const { verifyGoogleToken } = require('../utils/googleAuth');
 const { verifyAppleToken } = require('../utils/appleAuth');
@@ -24,11 +24,13 @@ async function generateUniqueUsername(baseUsername) {
 // Create a new client account with token verification
 async function createClient({ email, username, dateOfBirth, gender, provider, idToken, profileImage }) {
   try {
+    console.log('create client')
     let verifiedUserInfo = {};
     let providerId = '';
 
     // Verify token based on provider
     if (provider === 'google') {
+      console.log('got to google client')
       verifiedUserInfo = await verifyGoogleToken(idToken);
       providerId = verifiedUserInfo.googleId;
       
@@ -50,6 +52,7 @@ async function createClient({ email, username, dateOfBirth, gender, provider, id
         email = verifiedUserInfo.email;
       }
     } else {
+      console.log('Invalid provider. Only Google and Apple are supported.')
       throw new Error('Invalid provider. Only Google and Apple are supported.');
     }
 
@@ -87,6 +90,7 @@ async function createClient({ email, username, dateOfBirth, gender, provider, id
       type: user.type,
     };
   } catch (error) {
+    console.log({error, message:'failed to create'})
     throw new Error(`Failed to create client: ${error.message}`);
   }
 }
