@@ -22,9 +22,9 @@ async function generateUniqueUsername(baseUsername) {
 }
 
 // Create a new client account with token verification
-async function createClient({ email, username,name, dateOfBirth, gender, provider, idToken, profileImage }) {
+async function createClient({ email, username, name, dateOfBirth, gender, provider, idToken, profileImage }) {
   try {
-    console.log('create client')
+    console.log('create client',{ email, username, name, dateOfBirth, gender, provider, idToken, profileImage })
     let verifiedUserInfo = {};
     let providerId = '';
 

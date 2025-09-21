@@ -4,6 +4,7 @@ const clientService = require('../services/clientService');
 exports.createClient = async (req, res) => {
   try {
     const {
+      name,
       email,
       username,
       dateOfBirth,
@@ -14,13 +15,14 @@ exports.createClient = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!email || !username || !provider || !idToken) {
+    if (!email || !username ||  !name ||!provider || !idToken) {
       return res.status(400).json({ 
         error: 'Email, username, provider, and idToken are required' 
       });
     }
 
     const client = await clientService.createClient({
+      name,
       email,
       username,
       dateOfBirth,
