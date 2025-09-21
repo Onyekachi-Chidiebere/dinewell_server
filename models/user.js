@@ -19,12 +19,11 @@ User.init(
         restaurant_name: {
             type: DataTypes.STRING(255)
         },
-        firstname: {
+        
+        name: {
             type: DataTypes.STRING(255)
         },
-        lastname: {
-            type: DataTypes.STRING(255)
-        },
+      
         phone: {
             type: DataTypes.STRING(255)
         },
