@@ -130,6 +130,7 @@ async function signInClient({ email, provider, idToken }) {
     return {
       id: user.id,
       email: user.email,
+      name:user.name,
       username: user.username,
       dateOfBirth: user.date_of_birth,
       gender: user.gender,
