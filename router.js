@@ -9,6 +9,7 @@ const merchantController = require('./controllers/merchantController');
 const dishController = require('./controllers/dishController');
 const cardController = require('./controllers/cardController');
 const clientController = require('./controllers/clientController');
+const pointsController = require('./controllers/pointsController');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -50,5 +51,14 @@ router.get('/client/profile/:userId', clientController.getClientProfile);
 router.put('/client/profile/:userId', clientController.updateClientProfile);
 router.get('/client/username/check', clientController.checkUsernameAvailability);
 router.post('/client/username/suggest', clientController.generateUsernameSuggestion);
+
+// Points management routes
+router.post('/points', pointsController.createPoints);
+router.get('/points/:id', pointsController.getPointsById);
+router.put('/points/:id', pointsController.updatePoints);
+router.get('/restaurants/:restaurantId/points', pointsController.getPointsByRestaurant);
+router.get('/points/qr/:qrCode', pointsController.getPointsByQrCode);
+router.post('/points/:id/issue', pointsController.issuePoints);
+router.post('/points/scan/:qrCode', pointsController.scanQrCode);
 
 module.exports = router;
