@@ -14,9 +14,13 @@ Points.init(
             autoIncrement: true,
         },
         status: {
-            type: DataTypes.ENUM('pending', 'issued'),
+            type: DataTypes.ENUM('pending', 'completed'),
             allowNull: false,
             defaultValue: 'pending'
+        },
+        type: {
+            type: DataTypes.ENUM('issue', 'redeem'),
+            allowNull: false,
         },
         restaurant_id: {
             type: DataTypes.INTEGER,

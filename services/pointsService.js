@@ -13,6 +13,7 @@ function calculatePoints(price, pointsPerDollar = 10) {
  */
 async function savePoints({
     restaurantId,
+    type,
     customerId = null,
     dishes = [],
     totalPrice = 0,
@@ -41,6 +42,7 @@ async function savePoints({
         // Create points record
         const pointsRecord = await Points.create({
             status: 'pending',
+            type,
             restaurant_id: restaurantId,
             customer_id: customerId,
             dishes: dishes,
@@ -84,7 +86,7 @@ async function updatePoints(pointsId, updateData) {
         });
 
         // If status is being updated to 'issued', set date_issued
-        if (updateFields.status === 'issued') {
+        if (updateFields.status === 'completed') {
             updateFields.date_issued = new Date();
         }
 
