@@ -6,6 +6,7 @@ const pointsService = require('../services/pointsService');
 exports.createPoints = async (req, res) => {
     try {
         const {
+            type,
             restaurantId,
             customerId,
             dishes,
@@ -20,7 +21,11 @@ exports.createPoints = async (req, res) => {
                 error: 'Restaurant ID is required' 
             });
         }
-
+        if (!type) {
+            return res.status(400).json({ 
+                error: 'Points type' 
+            });
+        }
         if (!dishes || dishes.length === 0) {
             return res.status(400).json({ 
                 error: 'At least one dish is required' 
@@ -37,6 +42,7 @@ exports.createPoints = async (req, res) => {
         }
 
         const result = await pointsService.savePoints({
+            type,
             restaurantId,
             customerId,
             dishes,

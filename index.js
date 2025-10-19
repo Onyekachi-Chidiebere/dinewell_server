@@ -7,6 +7,7 @@ const { dbConnection } = require('./utils/db-connection');
 const router = require('./router');
 const User = require('./models/user');
 const Dish = require('./models/dish');
+const Point = require('./models/points')
 
 const port = process.env.PORT;
 
@@ -23,6 +24,7 @@ dbConnection();
 
 User.sync({ alter: true })
 Dish.sync({ alter: true })
+Point.sync({ alter: true })
 
 // initalize server
 httpServer.listen(port, () => {

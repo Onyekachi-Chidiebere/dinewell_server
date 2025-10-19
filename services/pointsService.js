@@ -20,6 +20,7 @@ async function savePoints({
     pointsPerDollar = 10,
     notes = null
 }) {
+
     try {
         // Validate required fields
         if (!restaurantId) {
