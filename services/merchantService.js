@@ -1,7 +1,9 @@
 const { uploadBufferToCloudinary } = require('../utils/cloudinary');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const { Op, fn, col, literal } = require('sequelize');
 const User = require('../models/user');
+const Points = require('../models/points');
 
 function normalizeUserResponse(userInstance) {
   const user = userInstance.get({ plain: true });
@@ -79,10 +81,104 @@ async function login({ email, password }) {
   return normalizeUserResponse(user);
 }
 
+function getTodayRange() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+async function merchantStatistics(merchantId) {
+  if (!merchantId) throw new Error('merchantId is required');
+  const { start, end } = getTodayRange();
+
+  // Today aggregates
+  const [issuedTodayRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: {
+      restaurant_id: merchantId,
+      type: 'issue',
+      status: 'completed',
+      date_used: { [Op.between]: [start, end] },
+    },
+    raw: true,
+  });
+  const [redeemedTodayRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: {
+      restaurant_id: merchantId,
+      type: 'redeem',
+      status: 'completed',
+      date_used: { [Op.between]: [start, end] },
+    },
+    raw: true,
+  });
+  const visitsToday = await Points.count({
+    where: {
+      restaurant_id: merchantId,
+      status: 'completed',
+      date_used: { [Op.between]: [start, end] },
+    },
+  });
+
+  // All-time aggregates
+  const allTimeVisits = await Points.count({
+    where: { restaurant_id: merchantId, status: 'completed' },
+  });
+  const [issuedAllRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: { restaurant_id: merchantId, type: 'issue', status: 'completed' },
+    raw: true,
+  });
+  const [redeemedAllRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: { restaurant_id: merchantId, type: 'redeem', status: 'completed' },
+    raw: true,
+  });
+
+  // Recent 5 transactions
+  const recent = await Points.findAll({
+    where: { restaurant_id: merchantId },
+    order: [['date_used', 'DESC']],
+    limit: 5,
+    raw: true,
+  });
+
+  const recentWithCustomer = [];
+  for (const p of recent) {
+    let customerImage = null;
+    if (p.customer_id) {
+      const customer = await User.findByPk(p.customer_id);
+      customerImage = customer ? customer.profile_image || null : null;
+    }
+    recentWithCustomer.push({
+      id: p.id,
+      customerImage,
+      notes: p.notes || null,
+      type: p.type,
+      amount: p.total_price,
+      points: p.total_points,
+      dateUsed: p.date_used,
+    });
+  }
+
+  return {
+    pointsIssuedToday: Number(issuedTodayRow?.sum || 0),
+    visitsToday: Number(visitsToday || 0),
+    pointsRedeemedToday: Number(redeemedTodayRow?.sum || 0),
+    allTimeVisits: Number(allTimeVisits || 0),
+    allTimePointsIssued: Number(issuedAllRow?.sum || 0),
+    allTimePointsRedeemed: Number(redeemedAllRow?.sum || 0),
+    recentTransactions: recentWithCustomer,
+  };
+}
+
 module.exports = {
   saveDetails,
   saveAddress,
   savePictures,
   saveCard,
   login,
+  merchantStatistics,
 };

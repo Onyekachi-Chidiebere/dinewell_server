@@ -30,6 +30,7 @@ router.post(
 );
 router.post('/merchant/signup/card', merchantController.signupCard);
 router.post('/merchant/login', merchantController.login);
+router.get('/merchant/:merchantId/statistics', merchantController.getStatistics);
 
 // Dish management routes
 router.post('/dishes', upload.single('dishImage'), dishController.createDish);

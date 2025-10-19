@@ -53,3 +53,14 @@ exports.login = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+
+exports.getStatistics = async (req, res) => {
+  try {
+    const { merchantId } = req.params;
+    if (!merchantId) return res.status(400).json({ error: 'merchantId is required' });
+    const stats = await merchantService.merchantStatistics(merchantId);
+    res.json(stats);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
