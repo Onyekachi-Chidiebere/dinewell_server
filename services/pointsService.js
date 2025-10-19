@@ -182,14 +182,14 @@ async function getPointsByQrCode(qrCode) {
 }
 
 /**
- * Issue points to customer (update status to issued)
+ * Issue points to customer (update status to completed)
  */
 async function issuePoints(pointsId, customerId = null) {
     try {
         const updateData = {
-            status: 'issued',
+            status: 'completed',
             customer_id: customerId,
-            date_issued: new Date()
+            date_used: new Date()
         };
 
         return await updatePoints(pointsId, updateData);
@@ -205,6 +205,6 @@ module.exports = {
     getPointsById,
     getPointsByRestaurant,
     getPointsByQrCode,
-    issuePoints,
+    issuePoints,// manages both issue and redeem points
     calculatePoints
 };

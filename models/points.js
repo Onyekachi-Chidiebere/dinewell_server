@@ -69,7 +69,7 @@ Points.init(
             allowNull: false,
             defaultValue: DataTypes.NOW
         },
-        date_issued: {
+        date_used: {
             type: DataTypes.DATE,
             allowNull: true
         },

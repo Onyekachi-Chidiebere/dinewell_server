@@ -28,16 +28,31 @@ app.use(cors({ origin: '*' }));
 // attach io to app so controllers can access it via req.app.get('io')
 app.set('io', io);
 
-io.on('connection', (socket) => {
-    // client or merchant can join a restaurant room
-    socket.on('joinRestaurant', (restaurantId) => {
-        if (!restaurantId) return;
-        socket.join(`restaurant:${restaurantId}`);
-    });
+io.on('connection', async (socket) => {
+    try {
+        const { userId, } = socket.handshake.query || {};
 
-    socket.on('disconnect', () => {
-        // no-op for now
-    });
+        // Persist or update socket id for this user
+        if (userId) {
+            try {
+                const SocketModel = require('./models/socket');
+                const existing = await SocketModel.findOne({ where: { user_id: userId } });
+                if (existing) {
+                    await existing.update({ socket_id: socket.id });
+                } else {
+                    await SocketModel.create({ user_id: userId, socket_id: socket.id });
+                }
+            } catch (err) {
+                console.error('Failed to upsert socket record:', err);
+            }
+        }
+
+        socket.on('disconnect', () => {
+            // Optionally handle cleanup here
+        });
+    } catch (e) {
+        console.error('Socket connection error:', e);
+    }
 });
 
 app.use('/', router);

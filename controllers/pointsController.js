@@ -1,4 +1,5 @@
 const pointsService = require('../services/pointsService');
+const SocketModel = require('../models/socket');
 
 /**
  * Create a new points transaction
@@ -209,20 +210,23 @@ exports.scanQrCode = async (req, res) => {
         // Issue the points
         const result = await pointsService.issuePoints(pointsResult.points.id, customerId);
 
-        // Notify merchant room via Socket.IO
+        // Notify merchant directly via stored socket id
         try {
             const io = req.app.get('io');
             if (io) {
-                const restaurantRoom = `restaurant:${pointsResult.points.restaurant_id}`;
-                io.to(restaurantRoom).emit('points:completed', {
-                    pointsId: pointsResult.points.id,
-                    restaurantId: pointsResult.points.restaurant_id,
-                    type: pointsResult.points.type,
-                    qrCode: pointsResult.points.qr_code,
-                    customerId: customerId || null,
-                    status: 'issued',
-                    dateIssued: new Date().toISOString()
-                });
+                const restaurantUserId = pointsResult.points.restaurant_id;
+                const restaurantSocket = await SocketModel.findOne({ where: { user_id: restaurantUserId } });
+                if (restaurantSocket && restaurantSocket.socket_id) {
+                    io.to(restaurantSocket.socket_id).emit('points:completed', {
+                        pointsId: pointsResult.points.id,
+                        restaurantId: restaurantUserId,
+                        type: pointsResult.points.type,
+                        qrCode: pointsResult.points.qr_code,
+                        customerId: customerId || null,
+                        status: 'issued',
+                        dateIssued: new Date().toISOString()
+                    });
+                }
             }
         } catch (emitErr) {
             console.error('Socket emit error:', emitErr);
