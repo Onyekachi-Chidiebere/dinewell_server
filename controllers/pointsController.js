@@ -208,6 +208,26 @@ exports.scanQrCode = async (req, res) => {
 
         // Issue the points
         const result = await pointsService.issuePoints(pointsResult.points.id, customerId);
+
+        // Notify merchant room via Socket.IO
+        try {
+            const io = req.app.get('io');
+            if (io) {
+                const restaurantRoom = `restaurant:${pointsResult.points.restaurant_id}`;
+                io.to(restaurantRoom).emit('points:completed', {
+                    pointsId: pointsResult.points.id,
+                    restaurantId: pointsResult.points.restaurant_id,
+                    type: pointsResult.points.type,
+                    qrCode: pointsResult.points.qr_code,
+                    customerId: customerId || null,
+                    status: 'issued',
+                    dateIssued: new Date().toISOString()
+                });
+            }
+        } catch (emitErr) {
+            console.error('Socket emit error:', emitErr);
+        }
+
         res.json(result);
     } catch (err) {
         console.error('Scan QR code error:', err);
