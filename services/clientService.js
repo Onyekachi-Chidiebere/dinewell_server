@@ -2,6 +2,9 @@ const  User  = require('../models/user');
 const bcrypt = require('bcrypt');
 const { verifyGoogleToken } = require('../utils/googleAuth');
 const { verifyAppleToken } = require('../utils/appleAuth');
+const { fn, col, Op } = require('sequelize');
+const Points = require('../models/points');
+const { getTodayRange } = require('../utils/functions');
 
 // Generate a unique username if the provided one is taken
 async function generateUniqueUsername(baseUsername) {
@@ -219,6 +222,92 @@ async function checkUsernameAvailability(username) {
   }
 }
 
+
+async function clientStatistics(clientId) {
+  if (!clientId) throw new Error('clientId is required');
+  const { start, end } = getTodayRange();
+
+  // Today aggregates
+  const [issuedTodayRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: {
+      customer_id: clientId,
+      type: 'issue',
+      status: 'completed',
+      date_used: { [Op.between]: [start, end] },
+    },
+    raw: true,
+  });
+  const [redeemedTodayRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: {
+      customer_id: clientId,
+      type: 'redeem',
+      status: 'completed',
+      date_used: { [Op.between]: [start, end] },
+    },
+    raw: true,
+  });
+  const visitsToday = await Points.count({
+    where: {
+      customer_id: clientId,
+      status: 'completed',
+      date_used: { [Op.between]: [start, end] },
+    },
+  });
+
+  // All-time aggregates
+  const allTimeVisits = await Points.count({
+    where: { customer_id: clientId, status: 'completed' },
+  });
+  const [issuedAllRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: { customer_id: clientId, type: 'issue', status: 'completed' }, 
+    raw: true,
+  });
+  const [redeemedAllRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: { customer_id: clientId, type: 'redeem', status: 'completed' },
+    raw: true,
+  });
+
+  // Recent 5 transactions
+  const recent = await Points.findAll({
+    where: { customer_id: clientId },
+    order: [['date_used', 'DESC']],
+    limit: 5,
+    raw: true,
+  });
+
+  const recentWithCustomer = [];
+  for (const p of recent) {
+    let customerImage = null;
+    if (p.customer_id) {
+      const customer = await User.findByPk(p.customer_id);
+      customerImage = customer ? customer.profile_image || null : null;
+    }
+    recentWithCustomer.push({
+      id: p.id,
+      customerImage,
+      notes: p.notes || null,
+      type: p.type,
+      amount: p.total_price,
+      points: p.total_points,
+      dateUsed: p.date_used,
+    });
+  }
+
+  return {
+    pointsIssuedToday: Number(issuedTodayRow?.sum || 0),
+    visitsToday: Number(visitsToday || 0),
+    pointsRedeemedToday: Number(redeemedTodayRow?.sum || 0),
+    allTimeVisits: Number(allTimeVisits || 0),
+    allTimePointsIssued: Number(issuedAllRow?.sum || 0),
+    allTimePointsRedeemed: Number(redeemedAllRow?.sum || 0),
+    recentTransactions: recentWithCustomer,
+    pointsBalance: Number(issuedAllRow?.sum || 0) - Number(redeemedAllRow?.sum || 0),
+  };
+}
 module.exports = {
   createClient,
   signInClient,
@@ -226,4 +315,5 @@ module.exports = {
   getClientProfile,
   checkUsernameAvailability,
   generateUniqueUsername,
+  clientStatistics
 };

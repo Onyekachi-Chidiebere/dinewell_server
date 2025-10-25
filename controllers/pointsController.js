@@ -216,6 +216,7 @@ exports.scanQrCode = async (req, res) => {
             if (io) {
                 const restaurantUserId = pointsResult.points.restaurant_id;
                 const restaurantSocket = await SocketModel.findOne({ where: { user_id: restaurantUserId } });
+              
                 if (restaurantSocket && restaurantSocket.socket_id) {
                     io.to(restaurantSocket.socket_id).emit('points:completed', {
                         pointsId: pointsResult.points.id,

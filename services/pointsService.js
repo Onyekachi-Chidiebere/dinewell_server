@@ -77,7 +77,7 @@ async function updatePoints(pointsId, updateData) {
         }
 
         // Prepare update data
-        const allowedUpdates = ['status', 'customer_id', 'notes'];
+        const allowedUpdates = ['status','date_used', 'customer_id', 'notes'];
         const updateFields = {};
         
         allowedUpdates.forEach(field => {

@@ -165,3 +165,14 @@ exports.generateUsernameSuggestion = async (req, res) => {
     });
   }
 };
+
+exports.getStatistics = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    if (!clientId) return res.status(400).json({ error: 'clientId is required' });
+    const stats = await clientService.clientStatistics(clientId);
+    res.json(stats);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

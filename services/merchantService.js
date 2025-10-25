@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const { Op, fn, col, literal } = require('sequelize');
 const User = require('../models/user');
 const Points = require('../models/points');
+const { getTodayRange } = require('../utils/functions');
 
 function normalizeUserResponse(userInstance) {
   const user = userInstance.get({ plain: true });
@@ -81,13 +82,6 @@ async function login({ email, password }) {
   return normalizeUserResponse(user);
 }
 
-function getTodayRange() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
-}
 
 async function merchantStatistics(merchantId) {
   if (!merchantId) throw new Error('merchantId is required');
