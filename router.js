@@ -11,6 +11,7 @@ const cardController = require('./controllers/cardController');
 const clientController = require('./controllers/clientController');
 const pointsController = require('./controllers/pointsController');
 const adminController = require('./controllers/adminController');
+const adminStatisticsController = require('./controllers/adminStatisticsController');
 const adminAuth = require('./utils/adminAuth');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -69,5 +70,14 @@ router.post('/admin/login', adminController.adminLogin);
 router.post('/admin/create', adminController.createAdmin);
 router.get('/admin/profile', adminAuth, adminController.getAdminProfile);
 router.put('/admin/password', adminAuth, adminController.updateAdminPassword);
+
+// Admin statistics routes
+router.get('/admin/statistics/restaurants', adminAuth, adminStatisticsController.getRestaurantStatistics);
+router.get('/admin/statistics/customers', adminAuth, adminStatisticsController.getCustomerStatistics);
+router.get('/admin/statistics/user-activity', adminAuth, adminStatisticsController.getUserActivityData);
+router.get('/admin/statistics/restaurant-leaderboard', adminAuth, adminStatisticsController.getRestaurantLeaderboard);
+router.get('/admin/statistics/customer-leaderboard', adminAuth, adminStatisticsController.getCustomerLeaderboard);
+router.get('/admin/statistics/points-graph', adminAuth, adminStatisticsController.getPointsGraphData);
+router.get('/admin/statistics/dashboard-overview', adminAuth, adminStatisticsController.getDashboardOverview);
 
 module.exports = router;

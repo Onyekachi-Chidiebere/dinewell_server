@@ -133,4 +133,19 @@ User.init(
     }
 );
 
+// Define associations
+User.associate = function(models) {
+  // User has many points as restaurant
+  User.hasMany(models.Points, {
+    foreignKey: 'restaurant_id',
+    as: 'restaurantPoints'
+  });
+  
+  // User has many points as customer
+  User.hasMany(models.Points, {
+    foreignKey: 'customer_id',
+    as: 'customerPoints'
+  });
+};
+
 module.exports = User;

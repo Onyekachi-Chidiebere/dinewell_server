@@ -208,3 +208,86 @@ Content-Type: application/json
   "password": "password123",
   "name": "<script>alert('XSS')</script>"
 }
+
+### 26. Get Restaurant Statistics
+GET {{baseUrl}}/admin/statistics/restaurants
+Authorization: Bearer {{accessToken}}
+
+### 27. Get Restaurant Statistics with Date Filter
+GET {{baseUrl}}/admin/statistics/restaurants?startDate=2024-01-01&endDate=2024-12-31
+Authorization: Bearer {{accessToken}}
+
+### 28. Get Customer Statistics
+GET {{baseUrl}}/admin/statistics/customers
+Authorization: Bearer {{accessToken}}
+
+### 29. Get Customer Statistics with Date Filter
+GET {{baseUrl}}/admin/statistics/customers?startDate=2024-01-01&endDate=2024-12-31
+Authorization: Bearer {{accessToken}}
+
+### 30. Get User Activity Data
+GET {{baseUrl}}/admin/statistics/user-activity
+Authorization: Bearer {{accessToken}}
+
+### 31. Get User Activity Data with Custom Days
+GET {{baseUrl}}/admin/statistics/user-activity?days=30
+Authorization: Bearer {{accessToken}}
+
+### 32. Get User Activity Data with Date Range
+GET {{baseUrl}}/admin/statistics/user-activity?startDate=2024-06-01&endDate=2024-06-30
+Authorization: Bearer {{accessToken}}
+
+### 33. Get Restaurant Leaderboard
+GET {{baseUrl}}/admin/statistics/restaurant-leaderboard
+Authorization: Bearer {{accessToken}}
+
+### 34. Get Restaurant Leaderboard with Limit
+GET {{baseUrl}}/admin/statistics/restaurant-leaderboard?limit=5
+Authorization: Bearer {{accessToken}}
+
+### 35. Get Restaurant Leaderboard with Date Filter
+GET {{baseUrl}}/admin/statistics/restaurant-leaderboard?startDate=2024-01-01&endDate=2024-12-31
+Authorization: Bearer {{accessToken}}
+
+### 36. Get Customer Leaderboard
+GET {{baseUrl}}/admin/statistics/customer-leaderboard
+Authorization: Bearer {{accessToken}}
+
+### 37. Get Customer Leaderboard with Limit
+GET {{baseUrl}}/admin/statistics/customer-leaderboard?limit=5
+Authorization: Bearer {{accessToken}}
+
+### 38. Get Customer Leaderboard with Date Filter
+GET {{baseUrl}}/admin/statistics/customer-leaderboard?startDate=2024-01-01&endDate=2024-12-31
+Authorization: Bearer {{accessToken}}
+
+### 39. Get Points Graph Data
+GET {{baseUrl}}/admin/statistics/points-graph
+Authorization: Bearer {{accessToken}}
+
+### 40. Get Points Graph Data with Custom Days
+GET {{baseUrl}}/admin/statistics/points-graph?days=30
+Authorization: Bearer {{accessToken}}
+
+### 41. Get Points Graph Data with Date Range
+GET {{baseUrl}}/admin/statistics/points-graph?startDate=2024-06-01&endDate=2024-06-30
+Authorization: Bearer {{accessToken}}
+
+### 42. Get Dashboard Overview
+GET {{baseUrl}}/admin/statistics/dashboard-overview
+Authorization: Bearer {{accessToken}}
+
+### 43. Get Dashboard Overview with Date Filter
+GET {{baseUrl}}/admin/statistics/dashboard-overview?startDate=2024-01-01&endDate=2024-12-31
+Authorization: Bearer {{accessToken}}
+
+### 44. Get Dashboard Overview with Custom Parameters
+GET {{baseUrl}}/admin/statistics/dashboard-overview?startDate=2024-06-01&endDate=2024-06-30&days=30&limit=10
+Authorization: Bearer {{accessToken}}
+
+### 45. Test Statistics Endpoint - No Auth (Should Fail)
+GET {{baseUrl}}/admin/statistics/restaurants
+
+### 46. Test Statistics Endpoint - Invalid Token (Should Fail)
+GET {{baseUrl}}/admin/statistics/restaurants
+Authorization: Bearer invalid_token_here

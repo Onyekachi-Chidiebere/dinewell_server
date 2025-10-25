@@ -87,4 +87,19 @@ Points.init(
     }
 );
 
+// Define associations
+Points.associate = function(models) {
+  // Points belong to a restaurant (merchant)
+  Points.belongsTo(models.User, {
+    foreignKey: 'restaurant_id',
+    as: 'restaurant'
+  });
+  
+  // Points belong to a customer (optional)
+  Points.belongsTo(models.User, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+  });
+};
+
 module.exports = Points;
