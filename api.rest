@@ -1,0 +1,210 @@
+### DineWell Admin API Endpoints
+
+# Base URL
+@baseUrl = http://192.168.8.37:3010
+
+### 1. Create Admin Account
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "admin@dinewell.com",
+  "password": "admin123",
+  "name": "System Administrator"
+}
+
+### 2. Admin Login
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "admin@dinewell.com",
+  "password": "admin123"
+}
+
+### 3. Get Admin Profile (Requires Authentication)
+GET {{baseUrl}}/admin/profile
+Authorization: Bearer {{accessToken}}
+
+### 4. Update Admin Password (Requires Authentication)
+PUT {{baseUrl}}/admin/password
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "currentPassword": "admin123",
+  "newPassword": "newpassword123"
+}
+
+### 5. Create Admin Account - Alternative Test Data
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "superadmin@dinewell.com",
+  "password": "superadmin123",
+  "name": "Super Administrator"
+}
+
+### 6. Create Admin Account - Minimal Data
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "testadmin@dinewell.com",
+  "password": "test123",
+  "name": "Test Admin"
+}
+
+### 7. Admin Login - Test Credentials
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "testadmin@dinewell.com",
+  "password": "test123"
+}
+
+### 8. Admin Login - Invalid Credentials (Error Test)
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "wrong@email.com",
+  "password": "wrongpassword"
+}
+
+### 9. Admin Login - Missing Fields (Validation Error Test)
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "admin@dinewell.com"
+}
+
+### 10. Create Admin - Duplicate Email (Error Test)
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "admin@dinewell.com",
+  "password": "anotherpassword",
+  "name": "Another Admin"
+}
+
+### 11. Create Admin - Missing Fields (Validation Error Test)
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "incomplete@dinewell.com"
+}
+
+### 12. Get Admin Profile - No Token (Authentication Error Test)
+GET {{baseUrl}}/admin/profile
+
+### 13. Get Admin Profile - Invalid Token (Authentication Error Test)
+GET {{baseUrl}}/admin/profile
+Authorization: Bearer invalid_token_here
+
+### 14. Update Password - No Token (Authentication Error Test)
+PUT {{baseUrl}}/admin/password
+Content-Type: application/json
+
+{
+  "currentPassword": "admin123",
+  "newPassword": "newpassword123"
+}
+
+### 15. Update Password - Wrong Current Password (Error Test)
+PUT {{baseUrl}}/admin/password
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "currentPassword": "wrongpassword",
+  "newPassword": "newpassword123"
+}
+
+### 16. Update Password - Missing Fields (Validation Error Test)
+PUT {{baseUrl}}/admin/password
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "currentPassword": "admin123"
+}
+
+### 17. Health Check
+GET {{baseUrl}}/health
+
+### 18. Server Status
+GET {{baseUrl}}/status
+
+### 19. Create Admin - Edge Case: Very Long Name
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "longname@dinewell.com",
+  "password": "password123",
+  "name": "This is a very long admin name that might test the database field limits and validation rules for the name field in the admin creation process"
+}
+
+### 20. Create Admin - Edge Case: Special Characters in Name
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "special@dinewell.com",
+  "password": "password123",
+  "name": "Admin O'Connor-Smith (CEO)"
+}
+
+### 21. Create Admin - Edge Case: Unicode Characters
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "unicode@dinewell.com",
+  "password": "password123",
+  "name": "管理员 管理员"
+}
+
+### 22. Admin Login - Case Sensitivity Test
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "ADMIN@DINEWELL.COM",
+  "password": "admin123"
+}
+
+### 23. Admin Login - Whitespace Test
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "  admin@dinewell.com  ",
+  "password": "  admin123  "
+}
+
+### 24. Create Admin - SQL Injection Test (Security Test)
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "hacker@dinewell.com",
+  "password": "password123",
+  "name": "'; DROP TABLE users; --"
+}
+
+### 25. Create Admin - XSS Test (Security Test)
+POST {{baseUrl}}/admin/create
+Content-Type: application/json
+
+{
+  "email": "xss@dinewell.com",
+  "password": "password123",
+  "name": "<script>alert('XSS')</script>"
+}
