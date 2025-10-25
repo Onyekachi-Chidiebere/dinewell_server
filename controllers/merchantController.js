@@ -64,3 +64,13 @@ exports.getStatistics = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+
+exports.getRestaurants = async (req, res) => {
+  try {
+    const { page = 1, limit = 10 } = req.query;
+    const result = await merchantService.getRestaurants(parseInt(page), parseInt(limit));
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

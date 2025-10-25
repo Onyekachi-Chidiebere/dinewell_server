@@ -291,3 +291,15 @@ GET {{baseUrl}}/admin/statistics/restaurants
 ### 46. Test Statistics Endpoint - Invalid Token (Should Fail)
 GET {{baseUrl}}/admin/statistics/restaurants
 Authorization: Bearer invalid_token_here
+
+### 47. Get Restaurants List (Paginated)
+GET {{baseUrl}}/merchant/restaurants
+
+### 48. Get Restaurants List with Pagination
+GET {{baseUrl}}/merchant/restaurants?page=1&limit=10
+
+### 49. Get Restaurants List - Second Page
+GET {{baseUrl}}/merchant/restaurants?page=2&limit=5
+
+### 50. Get Restaurants List - Large Page Size
+GET {{baseUrl}}/merchant/restaurants?page=1&limit=20

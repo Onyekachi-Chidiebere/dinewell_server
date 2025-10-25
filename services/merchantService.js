@@ -168,6 +168,82 @@ async function merchantStatistics(merchantId) {
   };
 }
 
+async function getRestaurants(page = 1, limit = 10) {
+  const offset = (page - 1) * limit;
+  
+  // Get statistics for all restaurants
+  const allCount = await User.count({
+    where: { type: 'Merchant' }
+  });
+  
+  const activeCount = await User.count({
+    where: { 
+      type: 'Merchant',
+      approval_status: 1 
+    }
+  });
+  
+  const pendingCount = await User.count({
+    where: { 
+      type: 'Merchant',
+      approval_status: 0 
+    }
+  });
+  
+  const disabledCount = await User.count({
+    where: { 
+      type: 'Merchant',
+      approval_status: -1 
+    }
+  });
+
+  // Get paginated restaurants
+  const restaurants = await User.findAll({
+    where: { type: 'Merchant' },
+    attributes: [
+      'id',
+      'restaurant_name',
+      'email',
+      'phone',
+      'approval_status',
+      'date_created',
+      'regions'
+    ],
+    order: [['date_created', 'DESC']],
+    limit: parseInt(limit),
+    offset: parseInt(offset),
+    raw: true
+  });
+
+  // Format restaurant data
+  const formattedRestaurants = restaurants.map(restaurant => ({
+    id: restaurant.id,
+    name: restaurant.restaurant_name,
+    location: restaurant.regions?.address?.location || 'Not specified',
+    status: restaurant.approval_status === 1 ? 'active' : 
+            restaurant.approval_status === 0 ? 'pending' : 'disabled',
+    email: restaurant.email,
+    phone: restaurant.phone,
+    dateCreated: restaurant.date_created
+  }));
+
+  return {
+    statistics: {
+      all: allCount,
+      active: activeCount,
+      pending: pendingCount,
+      disabled: disabledCount
+    },
+    restaurants: formattedRestaurants,
+    pagination: {
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(allCount / limit),
+      totalItems: allCount,
+      itemsPerPage: parseInt(limit)
+    }
+  };
+}
+
 module.exports = {
   saveDetails,
   saveAddress,
@@ -175,4 +251,5 @@ module.exports = {
   saveCard,
   login,
   merchantStatistics,
+  getRestaurants,
 };
