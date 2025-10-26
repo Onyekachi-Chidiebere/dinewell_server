@@ -186,3 +186,15 @@ exports.getCustomers = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+
+exports.getCustomerDetails = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    if (!customerId) return res.status(400).json({ error: 'customerId is required' });
+    const result = await clientService.getCustomerDetails(customerId, parseInt(page), parseInt(limit));
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

@@ -324,3 +324,12 @@ GET {{baseUrl}}/client/customers?page=2&limit=5
 
 ### 57. Get Customers List - Large Page Size
 GET {{baseUrl}}/client/customers?page=1&limit=20
+
+### 58. Get Customer Details
+GET {{baseUrl}}/client/customers/1
+
+### 59. Get Customer Details with Pagination
+GET {{baseUrl}}/client/customers/1?page=2&limit=5
+
+### 60. Get Customer Details - Non-existent Customer
+GET {{baseUrl}}/client/customers/99999

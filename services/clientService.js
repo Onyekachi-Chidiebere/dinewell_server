@@ -382,6 +382,140 @@ async function getCustomers(page = 1, limit = 10) {
   };
 }
 
+async function getCustomerDetails(customerId, page = 1, limit = 10) {
+  if (!customerId) throw new Error('customerId is required');
+
+  const offset = (page - 1) * limit;
+
+  // Get customer info
+  const customer = await User.findByPk(customerId, {
+    where: { type: 'Customer' },
+    attributes: [
+      'id',
+      'name',
+      'email',
+      'phone',
+      'profile_image'
+    ],
+    raw: true
+  });
+
+  if (!customer) {
+    throw new Error('Customer not found');
+  }
+
+  // Get total restaurant visits (count of all completed transactions)
+  const totalRestaurantVisits = await Points.count({
+    where: {
+      customer_id: customerId,
+      status: 'completed'
+    }
+  });
+
+  // Get total points earned (sum of all issued points)
+  const [pointsEarnedRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: {
+      customer_id: customerId,
+      type: 'issue',
+      status: 'completed'
+    },
+    raw: true
+  });
+
+  // Get total points redeemed (sum of all redeemed points)
+  const [pointsRedeemedRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: {
+      customer_id: customerId,
+      type: 'redeem',
+      status: 'completed'
+    },
+    raw: true
+  });
+
+  // Get paginated point transactions with restaurant names
+  const pointTransactions = await Points.findAll({
+    where: {
+      customer_id: customerId,
+      status: 'completed'
+    },
+    attributes: [
+      'id',
+      'restaurant_id',
+      'total_points',
+      'type',
+      'date_used',
+      'date_created'
+    ],
+    order: [['date_used', 'DESC']],
+    limit: parseInt(limit),
+    offset: parseInt(offset),
+    raw: true
+  });
+
+  // Get unique restaurant IDs from transactions
+  const restaurantIds = [...new Set(pointTransactions.map(t => t.restaurant_id))];
+
+  // Get restaurant names
+  const restaurants = await User.findAll({
+    where: {
+      id: { [Op.in]: restaurantIds },
+      type: 'Merchant'
+    },
+    attributes: [
+      'id',
+      'restaurant_name'
+    ],
+    raw: true
+  });
+
+  // Create a map of restaurant IDs to names
+  const restaurantMap = {};
+  restaurants.forEach(r => {
+    restaurantMap[r.id] = r.restaurant_name;
+  });
+
+  // Format point transactions with restaurant names
+  const formattedTransactions = pointTransactions.map(transaction => ({
+    id: transaction.id,
+    restaurant_name: restaurantMap[transaction.restaurant_id] || 'Unknown Restaurant',
+    points: transaction.total_points,
+    point_type: transaction.type === 'issue' ? 'Earned' : 'Redeemed',
+    date_used: transaction.date_used 
+  }));
+
+  // Get total count for pagination
+  const totalTransactions = await Points.count({
+    where: {
+      customer_id: customerId,
+      status: 'completed'
+    }
+  });
+
+  return {
+    customer: {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone || 'Not provided',
+      profile_image: customer.profile_image
+    },
+    statistics: {
+      total_restaurant_visits: totalRestaurantVisits,
+      points_earned: Number(pointsEarnedRow?.sum || 0),
+      points_redeemed: Number(pointsRedeemedRow?.sum || 0)
+    },
+    point_transactions: formattedTransactions,
+    pagination: {
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalTransactions / limit),
+      totalItems: totalTransactions,
+      itemsPerPage: parseInt(limit)
+    }
+  };
+}
+
 module.exports = {
   createClient,
   signInClient,
@@ -390,5 +524,6 @@ module.exports = {
   checkUsernameAvailability,
   generateUniqueUsername,
   clientStatistics,
-  getCustomers
+  getCustomers,
+  getCustomerDetails
 };
