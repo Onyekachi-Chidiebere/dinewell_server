@@ -303,3 +303,12 @@ GET {{baseUrl}}/merchant/restaurants?page=2&limit=5
 
 ### 50. Get Restaurants List - Large Page Size
 GET {{baseUrl}}/merchant/restaurants?page=1&limit=20
+
+### 51. Get Restaurant Details
+GET {{baseUrl}}/merchant/restaurants/1
+
+### 52. Get Restaurant Details - Non-existent Restaurant
+GET {{baseUrl}}/merchant/restaurants/99999
+
+### 53. Get Restaurant Details - Invalid ID
+GET {{baseUrl}}/merchant/restaurants/invalid

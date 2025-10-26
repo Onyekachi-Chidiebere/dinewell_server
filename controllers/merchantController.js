@@ -74,3 +74,14 @@ exports.getRestaurants = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+
+exports.getRestaurantDetails = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    if (!restaurantId) return res.status(400).json({ error: 'restaurantId is required' });
+    const result = await merchantService.getRestaurantDetails(restaurantId);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

@@ -244,6 +244,102 @@ async function getRestaurants(page = 1, limit = 10) {
   };
 }
 
+async function getRestaurantDetails(restaurantId) {
+  if (!restaurantId) throw new Error('restaurantId is required');
+
+  // Get restaurant details
+  const restaurant = await User.findByPk(restaurantId, {
+    where: { type: 'Merchant' },
+    attributes: [
+      'id',
+      'restaurant_name',
+      'email',
+      'phone',
+      'regions',
+      'approval_status',
+      'restaurant_logo'
+    ],
+    raw: true
+  });
+
+  if (!restaurant) {
+    throw new Error('Restaurant not found');
+  }
+
+  // Get current month date range
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  // Get total visits (count of completed points transactions)
+  const totalVisits = await Points.count({
+    where: {
+      restaurant_id: restaurantId,
+      status: 'completed'
+    }
+  });
+
+  // Get total points issued
+  const [totalPointsRow] = await Points.findAll({
+    attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+    where: {
+      restaurant_id: restaurantId,
+      type: 'issue',
+      status: 'completed'
+    },
+    raw: true
+  });
+
+  // Get points graph data for current month
+  const pointsGraphData = await Points.findAll({
+    attributes: [
+      [fn('DATE', col('date_used')), 'date'],
+      [fn('COALESCE', fn('SUM', literal("CASE WHEN type = 'issue' THEN total_points ELSE 0 END")), 0), 'no_of_points_issued'],
+      [fn('COALESCE', fn('SUM', literal("CASE WHEN type = 'redeem' THEN total_points ELSE 0 END")), 0), 'no_of_points_redeemed']
+    ],
+    where: {
+      restaurant_id: restaurantId,
+      status: 'completed',
+      date_used: {
+        [Op.between]: [startOfMonth, endOfMonth]
+      }
+    },
+    group: [fn('DATE', col('date_used'))],
+    order: [[fn('DATE', col('date_used')), 'ASC']],
+    raw: true
+  });
+
+  // Format points graph data
+  const formattedPointsGraph = pointsGraphData.map(item => ({
+    date: item.date,
+    no_of_points_issued: Number(item.no_of_points_issued || 0),
+    no_of_points_redeemed: Number(item.no_of_points_redeemed || 0)
+  }));
+
+  // Format restaurant details
+  const details = {
+    id: restaurant.id,
+    restaurant_name: restaurant.restaurant_name,
+    email: restaurant.email,
+    phone: restaurant.phone,
+    logo:restaurant.restaurant_logo,
+    website: restaurant.website || 'Not specified',
+    address: restaurant.regions?.address?.location || 'Not specified'
+  };
+
+  // Format analytics
+  const analytics = {
+    total_visits: totalVisits,
+    total_points: Number(totalPointsRow?.sum || 0),
+    points_graph: formattedPointsGraph
+  };
+
+  return {
+    details,
+    analytics
+  };
+}
+
 module.exports = {
   saveDetails,
   saveAddress,
@@ -252,4 +348,5 @@ module.exports = {
   login,
   merchantStatistics,
   getRestaurants,
+  getRestaurantDetails,
 };
