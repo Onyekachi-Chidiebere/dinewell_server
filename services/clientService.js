@@ -308,6 +308,80 @@ async function clientStatistics(clientId) {
     pointsBalance: Number(issuedAllRow?.sum || 0) - Number(redeemedAllRow?.sum || 0),
   };
 }
+async function getCustomers(page = 1, limit = 10) {
+  const offset = (page - 1) * limit;
+  
+  // Get total customers count
+  const totalCustomers = await User.count({
+    where: { type: 'Customer' }
+  });
+
+  // Get paginated customers with their statistics
+  const customers = await User.findAll({
+    where: { type: 'Customer' },
+    attributes: [
+      'id',
+      'name',
+      'email',
+      'phone',
+      'date_created'
+    ],
+    order: [['date_created', 'DESC']],
+    limit: parseInt(limit),
+    offset: parseInt(offset),
+    raw: true
+  });
+
+  // Get statistics for each customer
+  const customersWithStats = await Promise.all(
+    customers.map(async (customer) => {
+      // Get total points earned (issued points)
+      const [totalPointsRow] = await Points.findAll({
+        attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+        where: {
+          customer_id: customer.id,
+          type: 'issue',
+          status: 'completed'
+        },
+        raw: true
+      });
+
+      // Get total restaurants visited (unique restaurant count)
+      const uniqueRestaurants = await Points.findAll({
+        attributes: [[fn('COUNT', fn('DISTINCT', col('restaurant_id'))), 'count']],
+        where: {
+          customer_id: customer.id,
+          status: 'completed'
+        },
+        raw: true
+      });
+
+      return {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone || 'Not provided',
+        total_points_earned: Number(totalPointsRow?.sum || 0),
+        total_restaurants_visited: Number(uniqueRestaurants[0]?.count || 0),
+        date_created: customer.date_created
+      };
+    })
+  );
+
+  return {
+    statistics: {
+      total_customers: totalCustomers
+    },
+    customers: customersWithStats,
+    pagination: {
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalCustomers / limit),
+      totalItems: totalCustomers,
+      itemsPerPage: parseInt(limit)
+    }
+  };
+}
+
 module.exports = {
   createClient,
   signInClient,
@@ -315,5 +389,6 @@ module.exports = {
   getClientProfile,
   checkUsernameAvailability,
   generateUniqueUsername,
-  clientStatistics
+  clientStatistics,
+  getCustomers
 };

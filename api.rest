@@ -312,3 +312,15 @@ GET {{baseUrl}}/merchant/restaurants/99999
 
 ### 53. Get Restaurant Details - Invalid ID
 GET {{baseUrl}}/merchant/restaurants/invalid
+
+### 54. Get Customers List (Paginated)
+GET {{baseUrl}}/client/customers
+
+### 55. Get Customers List with Pagination
+GET {{baseUrl}}/client/customers?page=1&limit=10
+
+### 56. Get Customers List - Second Page
+GET {{baseUrl}}/client/customers?page=2&limit=5
+
+### 57. Get Customers List - Large Page Size
+GET {{baseUrl}}/client/customers?page=1&limit=20

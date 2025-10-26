@@ -58,6 +58,7 @@ router.put('/client/profile/:userId', clientController.updateClientProfile);
 router.get('/client/username/check', clientController.checkUsernameAvailability);
 router.post('/client/username/suggest', clientController.generateUsernameSuggestion);
 router.get('/client/:clientId/statistics', clientController.getStatistics);
+router.get('/client/customers', clientController.getCustomers);
 // Points management routes
 router.post('/points', pointsController.createPoints);
 router.get('/points/:id', pointsController.getPointsById);
