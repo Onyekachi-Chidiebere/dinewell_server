@@ -68,6 +68,7 @@ router.get('/restaurants/:restaurantId/points', pointsController.getPointsByRest
 router.get('/points/qr/:qrCode', pointsController.getPointsByQrCode);
 router.post('/points/:id/issue', pointsController.issuePoints);
 router.post('/points/scan/:qrCode', pointsController.scanQrCode);
+router.get('/points/admin/list', pointsController.getPointsForAdmin);
 
 // Admin management routes
 router.post('/admin/login', adminController.adminLogin);

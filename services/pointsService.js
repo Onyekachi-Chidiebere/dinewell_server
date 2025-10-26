@@ -71,15 +71,15 @@ async function savePoints({
 async function updatePoints(pointsId, updateData) {
     try {
         const pointsRecord = await Points.findByPk(pointsId);
-        
+
         if (!pointsRecord) {
             throw new Error('Points transaction not found');
         }
 
         // Prepare update data
-        const allowedUpdates = ['status','date_used', 'customer_id', 'notes'];
+        const allowedUpdates = ['status', 'date_used', 'customer_id', 'notes'];
         const updateFields = {};
-        
+
         allowedUpdates.forEach(field => {
             if (updateData[field] !== undefined) {
                 updateFields[field] = updateData[field];
@@ -111,7 +111,7 @@ async function updatePoints(pointsId, updateData) {
 async function getPointsById(pointsId) {
     try {
         const pointsRecord = await Points.findByPk(pointsId);
-        
+
         if (!pointsRecord) {
             throw new Error('Points transaction not found');
         }
@@ -132,7 +132,7 @@ async function getPointsById(pointsId) {
 async function getPointsByRestaurant(restaurantId, options = {}) {
     try {
         const { status, limit = 50, offset = 0 } = options;
-        
+
         const whereClause = { restaurant_id: restaurantId };
         if (status) {
             whereClause.status = status;
@@ -166,7 +166,7 @@ async function getPointsByQrCode(qrCode) {
         const pointsRecord = await Points.findOne({
             where: { qr_code: qrCode }
         });
-        
+
         if (!pointsRecord) {
             throw new Error('Points transaction not found');
         }
@@ -199,6 +199,132 @@ async function issuePoints(pointsId, customerId = null) {
     }
 }
 
+const User = require('../models/user');
+const { Op, fn, col } = require('sequelize');
+
+/**
+ * Get all points for admin with statistics and pagination
+ */
+async function getPointsForAdmin(page = 1, limit = 10) {
+    try {
+        const offset = (page - 1) * limit;
+
+        // Get total count of all points
+        const totalPoints = await Points.count({
+            where: {
+                status: 'completed'
+            }
+        });
+
+        // Get total count of issued points
+        const totalIssued = await Points.count({
+            where: {
+                status: 'completed',
+                type: 'issue'
+            }
+        });
+
+        // Get total count of redeemed points
+        const totalRedeemed = await Points.count({
+            where: {
+                status: 'completed',
+                type: 'redeem'
+            }
+        });
+
+        // Get paginated points
+        const points = await Points.findAll({
+            where: {
+                status: 'completed'
+            },
+            attributes: [
+                'id',
+                'restaurant_id',
+                'customer_id',
+                'total_points',
+                'type',
+                'date_used',
+                'date_created'
+            ],
+            order: [['date_used', 'DESC']],
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            raw: true
+        });
+
+        // Get unique restaurant IDs
+        const restaurantIds = [...new Set(points.map(p => p.restaurant_id))];
+
+        // Get unique customer IDs
+        const customerIds = [...new Set(points.map(p => p.customer_id).filter(Boolean))];
+
+        // Get restaurant names
+        const restaurants = await User.findAll({
+            where: {
+                id: { [Op.in]: restaurantIds },
+                type: 'Merchant'
+            },
+            attributes: [
+                'id',
+                'restaurant_name'
+            ],
+            raw: true
+        });
+
+        // Get customer names
+        const customers = await User.findAll({
+            where: {
+                id: { [Op.in]: customerIds },
+                type: 'Customer'
+            },
+            attributes: [
+                'id',
+                'name'
+            ],
+            raw: true
+        });
+
+        // Create maps for quick lookup
+        const restaurantMap = {};
+        restaurants.forEach(r => {
+            restaurantMap[r.id] = r.restaurant_name;
+        });
+
+        const customerMap = {};
+        customers.forEach(c => {
+            customerMap[c.id] = c.name;
+        });
+
+        // Format points data
+        const formattedPoints = points.map(point => ({
+            id: point.id,
+            restaurant_name: restaurantMap[point.restaurant_id] || 'Unknown Restaurant',
+            customer_name: point.customer_id ? (customerMap[point.customer_id] || 'Unknown Customer') : 'N/A',
+            points: point.total_points,
+            type: point.type,
+            date_used: point.date_used
+        }));
+
+        return {
+            statistics: {
+                total_points: totalPoints,
+                total_used: totalIssued,
+                total_redeemed: totalRedeemed
+            },
+            points: formattedPoints,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(totalPoints / limit),
+                totalItems: totalPoints,
+                itemsPerPage: parseInt(limit)
+            }
+        };
+    } catch (error) {
+        console.error('Error getting points for admin:', error);
+        throw new Error(`Failed to get points for admin: ${error.message}`);
+    }
+}
+
 module.exports = {
     savePoints,
     updatePoints,
@@ -206,5 +332,6 @@ module.exports = {
     getPointsByRestaurant,
     getPointsByQrCode,
     issuePoints,// manages both issue and redeem points
-    calculatePoints
+    calculatePoints,
+    getPointsForAdmin
 };

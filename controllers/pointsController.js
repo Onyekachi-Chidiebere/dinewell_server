@@ -241,3 +241,17 @@ exports.scanQrCode = async (req, res) => {
         });
     }
 };
+
+// Get all points for admin
+exports.getPointsForAdmin = async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        const result = await pointsService.getPointsForAdmin(parseInt(page), parseInt(limit));
+        res.json(result);
+    } catch (err) {
+        console.error('Get points for admin error:', err);
+        res.status(400).json({ 
+            error: err.message || 'Failed to get points for admin' 
+        });
+    }
+};
