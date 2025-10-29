@@ -345,3 +345,12 @@ GET {{baseUrl}}/points/admin/list?page=2&limit=5
 
 ### 64. Get Points List - Large Page Size
 GET {{baseUrl}}/points/admin/list?page=1&limit=20
+
+### 65. Get Points List - All Points
+GET {{baseUrl}}/points/admin/list?page=1&limit=10&type=all
+
+### 66. Get Points List - Issued Points Only
+GET {{baseUrl}}/points/admin/list?page=1&limit=10&type=issued
+
+### 67. Get Points List - Redeemed Points Only
+GET {{baseUrl}}/points/admin/list?page=1&limit=10&type=redeemed

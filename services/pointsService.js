@@ -205,21 +205,29 @@ const { Op, fn, col } = require('sequelize');
 /**
  * Get all points for admin with statistics and pagination
  */
-async function getPointsForAdmin(page = 1, limit = 10) {
+async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
     try {
         const offset = (page - 1) * limit;
 
+        // Build where clause based on filter type
+        const baseWhere = { status: 'completed' };
+        const filteredWhere = { ...baseWhere };
+        
+        if (filterType === 'issued') {
+            filteredWhere.type = 'issue';
+        } else if (filterType === 'redeemed') {
+            filteredWhere.type = 'redeem';
+        }
+
         // Get total count of all points
         const totalPoints = await Points.count({
-            where: {
-                status: 'completed'
-            }
+            where: baseWhere
         });
 
         // Get total count of issued points
         const totalIssued = await Points.count({
             where: {
-                status: 'completed',
+                ...baseWhere,
                 type: 'issue'
             }
         });
@@ -227,16 +235,19 @@ async function getPointsForAdmin(page = 1, limit = 10) {
         // Get total count of redeemed points
         const totalRedeemed = await Points.count({
             where: {
-                status: 'completed',
+                ...baseWhere,
                 type: 'redeem'
             }
         });
 
-        // Get paginated points
+        // Get filtered count based on filter type
+        const filteredCount = await Points.count({
+            where: filteredWhere
+        });
+
+        // Get paginated points with filter
         const points = await Points.findAll({
-            where: {
-                status: 'completed'
-            },
+            where: filteredWhere,
             attributes: [
                 'id',
                 'restaurant_id',
@@ -314,8 +325,8 @@ async function getPointsForAdmin(page = 1, limit = 10) {
             points: formattedPoints,
             pagination: {
                 currentPage: parseInt(page),
-                totalPages: Math.ceil(totalPoints / limit),
-                totalItems: totalPoints,
+                totalPages: Math.ceil(filteredCount / limit),
+                totalItems: filteredCount,
                 itemsPerPage: parseInt(limit)
             }
         };

@@ -245,8 +245,8 @@ exports.scanQrCode = async (req, res) => {
 // Get all points for admin
 exports.getPointsForAdmin = async (req, res) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
-        const result = await pointsService.getPointsForAdmin(parseInt(page), parseInt(limit));
+        const { page = 1, limit = 10, type = 'all' } = req.query;
+        const result = await pointsService.getPointsForAdmin(parseInt(page), parseInt(limit), type);
         res.json(result);
     } catch (err) {
         console.error('Get points for admin error:', err);
