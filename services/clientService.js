@@ -141,6 +141,7 @@ async function signInClient({ email, provider, idToken }) {
       type: user.type,
     };
   } catch (error) {
+    console.log({error, message:'failed to sign in'})
     throw new Error(`Failed to sign in client: ${error.message}`);
   }
 }
@@ -185,6 +186,7 @@ async function updateClientProfile({ userId, username, dateOfBirth, gender, prof
       type: user.type,
     };
   } catch (error) {
+    console.log({error, message:'failed to update client profile'})
     throw new Error(`Failed to update client profile: ${error.message}`);
   }
 }
@@ -218,6 +220,7 @@ async function checkUsernameAvailability(username) {
     const user = await User.findOne({ where: { username } });
     return { available: !user };
   } catch (error) {
+    console.log({error, message:'failed to check username availability'})
     throw new Error(`Failed to check username availability: ${error.message}`);
   }
 }
