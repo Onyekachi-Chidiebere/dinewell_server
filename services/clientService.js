@@ -102,6 +102,7 @@ async function createClient({ email, username, name, dateOfBirth, gender, provid
 
 // Sign in client with social provider and token verification
 async function signInClient({ email, provider, idToken }) {
+  console.log('sign in client',{ email, provider, idToken })
   try {
     let verifiedUserInfo = {};
     let providerId = '';
