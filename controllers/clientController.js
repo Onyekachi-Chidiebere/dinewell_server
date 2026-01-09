@@ -11,14 +11,23 @@ exports.createClient = async (req, res) => {
       gender,
       provider,
       idToken,
-      profileImage
+      profileImage,
+      password
     } = req.body;
 
-    // Validate required fields
-    if (!email || !username ||  !name ||!provider || !idToken) {
-      return res.status(400).json({ 
-        error: 'Email, username, provider, and idToken are required' 
-      });
+    // Validate required fields based on provider
+    if (provider === 'email') {
+      if (!email || !username || !name || !password) {
+        return res.status(400).json({ 
+          error: 'Email, username, name, and password are required' 
+        });
+      }
+    } else {
+      if (!email || !username || !name || !provider || !idToken) {
+        return res.status(400).json({ 
+          error: 'Email, username, name, provider, and idToken are required' 
+        });
+      }
     }
 
     const client = await clientService.createClient({
@@ -29,7 +38,8 @@ exports.createClient = async (req, res) => {
       gender,
       provider,
       idToken,
-      profileImage
+      profileImage,
+      password
     });
 
     res.status(201).json({
@@ -48,18 +58,29 @@ exports.createClient = async (req, res) => {
 // Sign in client
 exports.signInClient = async (req, res) => {
   try {
-    const { email, provider, idToken } = req.body;
-
-    if (!email || !provider || !idToken) {
-      return res.status(400).json({ 
-        error: 'Email, provider, and idToken are required' 
-      });
+    const { email, provider, idToken, password } = req.body;
+console.log('sign in client',{ email, provider, idToken, password })
+    // For email/password authentication
+    if (provider === 'email') {
+      if (!email || !password) {
+        return res.status(400).json({ 
+          error: 'Email and password are required' 
+        });
+      }
+    } else {
+      // For social provider authentication
+      if (!email || !provider || !idToken) {
+        return res.status(400).json({ 
+          error: 'Email, provider, and idToken are required' 
+        });
+      }
     }
 
     const client = await clientService.signInClient({
       email,
       provider,
-      idToken
+      idToken,
+      password
     });
 
     res.json({

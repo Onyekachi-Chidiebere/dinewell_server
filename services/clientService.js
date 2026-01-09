@@ -24,39 +24,47 @@ async function generateUniqueUsername(baseUsername) {
   return finalUsername;
 }
 
-// Create a new client account with token verification
-async function createClient({ email, username, name, dateOfBirth, gender, provider, idToken, profileImage }) {
+// Create a new client account with token verification or email/password
+async function createClient({ email, username, name, dateOfBirth, gender, provider, idToken, profileImage, password }) {
   try {
-    console.log('create client',{ email, username, name, dateOfBirth, gender, provider, idToken, profileImage })
+    console.log('create client',{ email, username, name, dateOfBirth, gender, provider, idToken, profileImage, hasPassword: !!password })
     let verifiedUserInfo = {};
     let providerId = '';
+    let hashedPassword = null;
 
-    // Verify token based on provider
-    if (provider === 'google') {
-      console.log('got to google client')
-      verifiedUserInfo = await verifyGoogleToken(idToken);
-      providerId = verifiedUserInfo.googleId;
-      
-      // Use verified email if different from provided email
-      if (verifiedUserInfo.email && verifiedUserInfo.email !== email) {
-        email = verifiedUserInfo.email;
-      }
-      
-      // Use Google profile image if available
-      if (verifiedUserInfo.picture && !profileImage) {
-        profileImage = verifiedUserInfo.picture;
-      }
-    } else if (provider === 'apple') {
-      verifiedUserInfo = await verifyAppleToken(idToken);
-      providerId = verifiedUserInfo.appleId;
-      
-      // Use verified email if different from provided email
-      if (verifiedUserInfo.email && verifiedUserInfo.email !== email) {
-        email = verifiedUserInfo.email;
+    // Email/password registration
+    if (provider === 'email' && password) {
+      // Hash password
+      const saltRounds = 12;
+      hashedPassword = await bcrypt.hash(password, saltRounds);
+    } else if (provider === 'google' || provider === 'apple') {
+      // Verify token based on provider
+      if (provider === 'google') {
+        console.log('got to google client')
+        verifiedUserInfo = await verifyGoogleToken(idToken);
+        providerId = verifiedUserInfo.googleId;
+        
+        // Use verified email if different from provided email
+        if (verifiedUserInfo.email && verifiedUserInfo.email !== email) {
+          email = verifiedUserInfo.email;
+        }
+        
+        // Use Google profile image if available
+        if (verifiedUserInfo.picture && !profileImage) {
+          profileImage = verifiedUserInfo.picture;
+        }
+      } else if (provider === 'apple') {
+        verifiedUserInfo = await verifyAppleToken(idToken);
+        providerId = verifiedUserInfo.appleId;
+        
+        // Use verified email if different from provided email
+        if (verifiedUserInfo.email && verifiedUserInfo.email !== email) {
+          email = verifiedUserInfo.email;
+        }
       }
     } else {
-      console.log('Invalid provider. Only Google and Apple are supported.')
-      throw new Error('Invalid provider. Only Google and Apple are supported.');
+      console.log('Invalid provider. Only Google, Apple, and email are supported.')
+      throw new Error('Invalid provider. Only Google, Apple, and email are supported.');
     }
 
     // Check if user already exists
@@ -77,6 +85,7 @@ async function createClient({ email, username, name, dateOfBirth, gender, provid
       gender,
       provider,
       provider_id: providerId,
+      password: hashedPassword,
       profile_image: profileImage,
       type: 'Customer',
       approval_status: 1, // Auto-approve clients
@@ -100,10 +109,51 @@ async function createClient({ email, username, name, dateOfBirth, gender, provid
   }
 }
 
-// Sign in client with social provider and token verification
-async function signInClient({ email, provider, idToken }) {
-  console.log('sign in client',{ email, provider, idToken })
+// Sign in client with social provider and token verification or email/password
+async function signInClient({ email, provider, idToken, password }) {
+  console.log('sign in client',{ email, provider, idToken, hasPassword: !!password })
   try {
+    // Email/password authentication
+    if (provider === 'email' && password) {
+      const user = await User.findOne({ 
+        where: { 
+          email,
+          provider: 'email',
+          type: 'Customer'
+        } 
+      });
+
+      if (!user) {
+        throw new Error('Invalid credentials');
+      }
+
+      if (!user.password) {
+        throw new Error('Password not set for this account. Please use social login or reset your password.');
+      }
+
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        throw new Error('Invalid credentials');
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        username: user.username,
+        dateOfBirth: user.date_of_birth,
+        gender: user.gender,
+        profileImage: user.profile_image,
+        type: user.type,
+      };
+    }
+
+    // Social provider authentication (Google/Apple)
+    if (!idToken) {
+      throw new Error('idToken is required for social provider authentication');
+    }
+
     let verifiedUserInfo = {};
     let providerId = '';
 
@@ -115,7 +165,7 @@ async function signInClient({ email, provider, idToken }) {
       verifiedUserInfo = await verifyAppleToken(idToken);
       providerId = verifiedUserInfo.appleId;
     } else {
-      throw new Error('Invalid provider. Only Google and Apple are supported.');
+      throw new Error('Invalid provider. Only Google, Apple, and email are supported.');
     }
 
     // Find user by provider ID and email
@@ -143,7 +193,7 @@ async function signInClient({ email, provider, idToken }) {
     };
   } catch (error) {
     console.log({error, message:'failed to sign in'})
-    throw new Error(`Failed to sign in client: ${error.message}`);
+    throw new Error(`${error.message}`);
   }
 }
 
