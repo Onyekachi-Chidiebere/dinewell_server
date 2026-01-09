@@ -32,11 +32,17 @@ async function createClient({ email, username, name, dateOfBirth, gender, provid
     let providerId = '';
     let hashedPassword = null;
 
-    // Email/password registration
-    if (provider === 'email' && password) {
-      // Hash password
+    // Hash password if provided (for email provider or social providers with password)
+    if (password) {
       const saltRounds = 12;
       hashedPassword = await bcrypt.hash(password, saltRounds);
+    }
+
+    // Email/password registration
+    if (provider === 'email') {
+      if (!password) {
+        throw new Error('Password is required for email registration');
+      }
     } else if (provider === 'google' || provider === 'apple') {
       // Verify token based on provider
       if (provider === 'google') {
@@ -118,7 +124,7 @@ async function signInClient({ email, provider, idToken, password }) {
       const user = await User.findOne({ 
         where: { 
           email,
-          provider: 'email',
+          // provider: 'email',
           type: 'Customer'
         } 
       });

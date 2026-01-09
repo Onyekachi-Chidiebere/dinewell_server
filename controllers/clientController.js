@@ -15,6 +15,15 @@ exports.createClient = async (req, res) => {
       password
     } = req.body;
 
+    console.log({  
+      name,
+      email,
+      username,
+      dateOfBirth,
+      gender,
+      provider,
+      idToken,
+      password})
     // Validate required fields based on provider
     if (provider === 'email') {
       if (!email || !username || !name || !password) {
