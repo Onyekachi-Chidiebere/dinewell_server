@@ -919,6 +919,88 @@ async function getPointsEarnedData(clientId) {
   }
 }
 
+// Get all restaurants with total points issued by each
+async function getAllRestaurants() {
+  try {
+    // Get all merchants/restaurants
+    const restaurants = await User.findAll({
+      where: {
+        type: 'Merchant',
+        approval_status: 1 // Only approved restaurants
+      },
+      attributes: [
+        'id',
+        'restaurant_name',
+        'restaurant_logo',
+        'profile_image',
+        'restaurant_images',
+        'regions'
+      ],
+      raw: true
+    });
+
+    if (restaurants.length === 0) {
+      return {
+        restaurants: []
+      };
+    }
+
+    const restaurantIds = restaurants.map(r => r.id);
+
+    // Get total points issued for each restaurant
+    const pointsData = await Points.findAll({
+      where: {
+        restaurant_id: { [Op.in]: restaurantIds },
+        type: 'issue',
+        status: 'completed'
+      },
+      attributes: [
+        'restaurant_id',
+        [fn('SUM', col('total_points')), 'total_points_issued']
+      ],
+      group: ['restaurant_id'],
+      raw: true
+    });
+
+    // Create a map of restaurant_id to total points
+    const pointsMap = {};
+    pointsData.forEach(item => {
+      pointsMap[item.restaurant_id] = Number(item.total_points_issued || 0);
+    });
+
+    // Format restaurants with total points issued
+    const formattedRestaurants = restaurants.map(restaurant => {
+      const totalPointsIssued = pointsMap[restaurant.id] || 0;
+      const restaurantImage = restaurant.restaurant_images && restaurant.restaurant_images.length > 0 
+        ? restaurant.restaurant_images[0] 
+        : restaurant.profile_image || null;
+      const restaurantLogo = restaurant.restaurant_logo || restaurant.profile_image || null;
+      const location = restaurant.regions?.address?.location || restaurant.regions?.location || 'Montreal, Canada';
+
+      return {
+        id: restaurant.id.toString(),
+        name: restaurant.restaurant_name || 'Unknown Restaurant',
+        location: location,
+        image: restaurantImage,
+        logo: restaurantLogo,
+        rating: 4.5, // Default rating, can be updated if rating field exists
+        points: totalPointsIssued,
+        category: 'Fine Dining' // Default category, can be updated if category field exists
+      };
+    });
+
+    // Sort by points issued (descending)
+    formattedRestaurants.sort((a, b) => b.points - a.points);
+
+    return {
+      restaurants: formattedRestaurants
+    };
+  } catch (error) {
+    console.log({ error, message: 'failed to get all restaurants' });
+    throw new Error(`Failed to get all restaurants: ${error.message}`);
+  }
+}
+
 // Get restaurants visited by client with total points earned at each
 async function getVisitedRestaurants(clientId) {
   try {
@@ -1101,5 +1183,6 @@ module.exports = {
   getPointsEarnedData,
   getRestaurantsVisitedData,
   getTransactionHistory,
-  getVisitedRestaurants
+  getVisitedRestaurants,
+  getAllRestaurants
 };

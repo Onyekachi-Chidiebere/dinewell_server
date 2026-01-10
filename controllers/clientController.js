@@ -363,3 +363,20 @@ exports.getVisitedRestaurants = async (req, res) => {
     });
   }
 };
+
+// Get all restaurants with total points issued
+exports.getAllRestaurants = async (req, res) => {
+  try {
+    const result = await clientService.getAllRestaurants();
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({
+      error: err.message
+    });
+  }
+};
