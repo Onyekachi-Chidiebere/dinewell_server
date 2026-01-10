@@ -313,3 +313,28 @@ exports.getRestaurantsVisitedData = async (req, res) => {
     });
   }
 };
+
+// Get transaction history for client
+exports.getTransactionHistory = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    
+    if (!clientId) {
+      return res.status(400).json({
+        error: 'Client ID is required'
+      });
+    }
+
+    const result = await clientService.getTransactionHistory(parseInt(clientId));
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({
+      error: err.message
+    });
+  }
+};

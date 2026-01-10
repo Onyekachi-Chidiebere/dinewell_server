@@ -919,6 +919,90 @@ async function getPointsEarnedData(clientId) {
   }
 }
 
+// Get transaction history grouped by day (all transactions, not just this week)
+async function getTransactionHistory(clientId) {
+  try {
+    if (!clientId) throw new Error('clientId is required');
+
+    // Get all completed transactions (both issue and redeem)
+    const allTransactions = await Points.findAll({
+      where: {
+        customer_id: clientId,
+        status: 'completed'
+      },
+      order: [['date_used', 'DESC']],
+      raw: true,
+    });
+
+    if (allTransactions.length === 0) {
+      return {
+        weekData: []
+      };
+    }
+
+    // Get restaurant IDs
+    const restaurantIds = [...new Set(allTransactions.map(t => t.restaurant_id).filter(Boolean))];
+    
+    // Get restaurant names
+    const restaurants = await User.findAll({
+      where: {
+        id: { [Op.in]: restaurantIds },
+        type: 'Merchant'
+      },
+      attributes: ['id', 'restaurant_name'],
+      raw: true
+    });
+
+    const restaurantMap = {};
+    restaurants.forEach(r => {
+      restaurantMap[r.id] = r.restaurant_name;
+    });
+
+    // Group transactions by day
+    const dayMap = new Map();
+    
+    allTransactions.forEach((transaction) => {
+      const dateUsed = new Date(transaction.date_used);
+      const dateKey = dateUsed.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      if (!dayMap.has(dateKey)) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayName = dayNames[dateUsed.getDay()];
+        const formattedDate = `${String(dateUsed.getDate()).padStart(2, '0')}/${String(dateUsed.getMonth() + 1).padStart(2, '0')}/${dateUsed.getFullYear()}`;
+        
+        dayMap.set(dateKey, {
+          date: formattedDate,
+          dayName: dayName,
+          transactions: []
+        });
+      }
+      
+      const dayData = dayMap.get(dateKey);
+      dayData.transactions.push({
+        id: transaction.id.toString(),
+        points: transaction.total_points,
+        restaurant: restaurantMap[transaction.restaurant_id] || 'Unknown Restaurant',
+        order: dayData.transactions.length + 1
+      });
+    });
+
+    // Convert map to array and sort by date (newest first)
+    const weekData = Array.from(dayMap.values()).sort((a, b) => {
+      // Parse dates for comparison
+      const dateA = a.date.split('/').reverse().join('-');
+      const dateB = b.date.split('/').reverse().join('-');
+      return new Date(dateB) - new Date(dateA);
+    });
+
+    return {
+      weekData
+    };
+  } catch (error) {
+    console.log({ error, message: 'failed to get transaction history' });
+    throw new Error(`Failed to get transaction history: ${error.message}`);
+  }
+}
+
 module.exports = {
   createClient,
   signInClient,
@@ -931,5 +1015,6 @@ module.exports = {
   getCustomerDetails,
   sharePoints,
   getPointsEarnedData,
-  getRestaurantsVisitedData
+  getRestaurantsVisitedData,
+  getTransactionHistory
 };
