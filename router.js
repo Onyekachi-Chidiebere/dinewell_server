@@ -54,7 +54,7 @@ router.get('/cards', cardController.list);
 router.post('/client/signup', clientController.createClient);
 router.post('/client/signin', clientController.signInClient);
 router.get('/client/profile/:userId', clientController.getClientProfile);
-router.put('/client/profile/:userId', clientController.updateClientProfile);
+router.put('/client/profile/:userId', upload.single('profileImage'), clientController.updateClientProfile);
 router.get('/client/username/check', clientController.checkUsernameAvailability);
 router.post('/client/username/suggest', clientController.generateUsernameSuggestion);
 router.get('/client/:clientId/statistics', clientController.getStatistics);

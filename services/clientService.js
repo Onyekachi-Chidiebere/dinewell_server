@@ -5,6 +5,7 @@ const { verifyAppleToken } = require('../utils/appleAuth');
 const { fn, col, Op } = require('sequelize');
 const Points = require('../models/points');
 const { getTodayRange } = require('../utils/functions');
+const { uploadBufferToCloudinary } = require('../utils/cloudinary');
 
 // Generate a unique username if the provided one is taken
 async function generateUniqueUsername(baseUsername) {
@@ -204,7 +205,7 @@ async function signInClient({ email, provider, idToken, password }) {
 }
 
 // Update client profile
-async function updateClientProfile({ userId, username, dateOfBirth, gender, profileImage }) {
+async function updateClientProfile({ userId, username, dateOfBirth, gender, name, profileImageFile }) {
   try {
     const user = await User.findByPk(userId);
     if (!user) {
@@ -229,13 +230,30 @@ async function updateClientProfile({ userId, username, dateOfBirth, gender, prof
     if (username) updateData.username = username;
     if (dateOfBirth) updateData.date_of_birth = dateOfBirth;
     if (gender) updateData.gender = gender;
-    if (profileImage) updateData.profile_image = profileImage;
+    if (name) updateData.name = name;
+
+    // Handle profile image upload to Cloudinary
+    if (profileImageFile) {
+      try {
+        const imageUrl = await uploadBufferToCloudinary(
+          profileImageFile.buffer,
+          'client-profiles',
+          `profile-${userId}-${Date.now()}`,
+          profileImageFile.mimetype
+        );
+        updateData.profile_image = imageUrl;
+      } catch (uploadError) {
+        console.error('Error uploading profile image to Cloudinary:', uploadError);
+        throw new Error('Failed to upload profile image');
+      }
+    }
 
     await user.update(updateData);
 
     return {
       id: user.id,
       email: user.email,
+      name: user.name,
       username: user.username,
       dateOfBirth: user.date_of_birth,
       gender: user.gender,

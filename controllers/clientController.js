@@ -15,15 +15,6 @@ exports.createClient = async (req, res) => {
       password
     } = req.body;
 
-    console.log({  
-      name,
-      email,
-      username,
-      dateOfBirth,
-      gender,
-      provider,
-      idToken,
-      password})
     // Validate required fields based on provider
     if (provider === 'email') {
       if (!email || !username || !name || !password) {
@@ -68,7 +59,6 @@ exports.createClient = async (req, res) => {
 exports.signInClient = async (req, res) => {
   try {
     const { email, provider, idToken, password } = req.body;
-console.log('sign in client',{ email, provider, idToken, password })
     // For email/password authentication
     if (provider === 'email') {
       if (!email || !password) {
@@ -108,14 +98,28 @@ console.log('sign in client',{ email, provider, idToken, password })
 exports.updateClientProfile = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { username, dateOfBirth, gender, profileImage } = req.body;
+    const { username, dateOfBirth, gender, name } = req.body;
+    const profileImageFile = req.file; // Multer will attach the file here
+
+    console.log('Update profile request:', {
+      userId,
+      body: req.body,
+      file: profileImageFile ? {
+        fieldname: profileImageFile.fieldname,
+        originalname: profileImageFile.originalname,
+        mimetype: profileImageFile.mimetype,
+        size: profileImageFile.size,
+        hasBuffer: !!profileImageFile.buffer
+      } : 'No file received'
+    });
 
     const client = await clientService.updateClientProfile({
       userId,
       username,
       dateOfBirth,
       gender,
-      profileImage
+      name,
+      profileImageFile
     });
 
     res.json({
@@ -124,6 +128,7 @@ exports.updateClientProfile = async (req, res) => {
       client
     });
   } catch (err) {
+    console.log({err})
     res.status(400).json({ 
       error: err.message 
     });
