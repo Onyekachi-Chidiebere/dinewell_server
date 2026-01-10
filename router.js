@@ -60,6 +60,7 @@ router.post('/client/username/suggest', clientController.generateUsernameSuggest
 router.get('/client/:clientId/statistics', clientController.getStatistics);
 router.get('/client/customers', clientController.getCustomers);
 router.get('/client/customers/:customerId', clientController.getCustomerDetails);
+router.post('/client/:senderId/share-points', clientController.sharePoints);
 // Points management routes
 router.post('/points', pointsController.createPoints);
 router.get('/points/:id', pointsController.getPointsById);

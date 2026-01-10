@@ -233,3 +233,33 @@ exports.getCustomerDetails = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
+
+// Share points between clients
+exports.sharePoints = async (req, res) => {
+  try {
+    const { senderId } = req.params;
+    const { recipientUsername, points } = req.body;
+
+    if (!senderId || !recipientUsername || !points) {
+      return res.status(400).json({
+        error: 'Sender ID, recipient username, and points are required'
+      });
+    }
+
+    const result = await clientService.sharePoints({
+      senderId: parseInt(senderId),
+      recipientUsername,
+      points: parseInt(points)
+    });
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({
+      error: err.message
+    });
+  }
+};

@@ -460,6 +460,113 @@ async function getCustomers(page = 1, limit = 10) {
   };
 }
 
+// Share points between clients
+async function sharePoints({ senderId, recipientUsername, points }) {
+  try {
+    if (!senderId || !recipientUsername || !points) {
+      throw new Error('Sender ID, recipient username, and points are required');
+    }
+
+    if (points <= 0) {
+      throw new Error('Points must be greater than 0');
+    }
+
+    // Find recipient by username
+    const recipient = await User.findOne({
+      where: {
+        username: recipientUsername,
+        type: 'Customer'
+      }
+    });
+
+    if (!recipient) {
+      throw new Error('Recipient not found');
+    }
+
+    if (recipient.id === senderId) {
+      throw new Error('Cannot share points with yourself');
+    }
+
+    // Calculate sender's current points balance
+    const [senderIssuedRow] = await Points.findAll({
+      attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+      where: {
+        customer_id: senderId,
+        type: 'issue',
+        status: 'completed'
+      },
+      raw: true,
+    });
+
+    const [senderRedeemedRow] = await Points.findAll({
+      attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+      where: {
+        customer_id: senderId,
+        type: 'redeem',
+        status: 'completed'
+      },
+      raw: true,
+    });
+
+    const senderBalance = Number(senderIssuedRow?.sum || 0) - Number(senderRedeemedRow?.sum || 0);
+
+    // Validate sender has enough points
+    if (senderBalance < points) {
+      throw new Error(`Insufficient points. Available: ${senderBalance}, Requested: ${points}`);
+    }
+
+    // Get sender info for notes
+    const sender = await User.findByPk(senderId);
+    if (!sender) {
+      throw new Error('Sender not found');
+    }
+
+    const shareReference = `SHARE_${Date.now()}_${senderId}_${recipient.id}`;
+    const now = new Date();
+
+    // Create redeem transaction for sender (deduct points)
+    const senderTransaction = await Points.create({
+      status: 'completed',
+      type: 'redeem',
+      restaurant_id: null, // No restaurant for shared points
+      customer_id: senderId,
+      dishes: [],
+      total_price: 0,
+      total_points: points,
+      points_per_dollar: 0,
+      qr_code: null,
+      date_used: now,
+      notes: `Shared ${points} points with ${recipient.username} (${shareReference})`
+    });
+
+    // Create issue transaction for recipient (add points)
+    const recipientTransaction = await Points.create({
+      status: 'completed',
+      type: 'issue',
+      restaurant_id: null, // No restaurant for shared points
+      customer_id: recipient.id,
+      dishes: [],
+      total_price: 0,
+      total_points: points,
+      points_per_dollar: 0,
+      qr_code: null,
+      date_used: now,
+      notes: `Received ${points} points from ${sender.username} (${shareReference})`
+    });
+
+    return {
+      success: true,
+      message: `Successfully shared ${points} points with ${recipient.username}`,
+      senderBalance: senderBalance - points,
+      recipientBalance: points, // This is just the amount received, not total balance
+      shareReference
+    };
+  } catch (error) {
+    console.log({ error, message: 'failed to share points' });
+    throw new Error(`Failed to share points: ${error.message}`);
+  }
+}
+
 async function getCustomerDetails(customerId, page = 1, limit = 10) {
   if (!customerId) throw new Error('customerId is required');
 
@@ -603,5 +710,6 @@ module.exports = {
   generateUniqueUsername,
   clientStatistics,
   getCustomers,
-  getCustomerDetails
+  getCustomerDetails,
+  sharePoints
 };
