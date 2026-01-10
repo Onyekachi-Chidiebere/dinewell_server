@@ -939,6 +939,8 @@ async function getAllRestaurants() {
       raw: true
     });
 
+    console.log({restaurants})
+
     if (restaurants.length === 0) {
       return {
         restaurants: []
