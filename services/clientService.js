@@ -701,6 +701,112 @@ async function getCustomerDetails(customerId, page = 1, limit = 10) {
   };
 }
 
+// Get restaurants visited data grouped by week
+async function getRestaurantsVisitedData(clientId) {
+  try {
+    if (!clientId) throw new Error('clientId is required');
+
+    // Get all-time visits count (all completed transactions)
+    const totalVisits = await Points.count({
+      where: {
+        customer_id: clientId,
+        status: 'completed'
+      }
+    });
+
+    // Get current week range (Monday to Sunday)
+    const { start: weekStart, end: weekEnd } = getCurrentWeekRange();
+
+    // Get this week's visits count
+    const thisWeek = await Points.count({
+      where: {
+        customer_id: clientId,
+        status: 'completed',
+        date_used: { [Op.between]: [weekStart, weekEnd] }
+      }
+    });
+
+    // Get all transactions for this week (both issue and redeem count as visits)
+    const weekTransactions = await Points.findAll({
+      where: {
+        customer_id: clientId,
+        status: 'completed',
+        date_used: { [Op.between]: [weekStart, weekEnd] }
+      },
+      order: [['date_used', 'DESC']],
+      raw: true,
+    });
+
+    // Get restaurant IDs
+    const restaurantIds = [...new Set(weekTransactions.map(t => t.restaurant_id).filter(Boolean))];
+    
+    // Get restaurant names and logos
+    const restaurants = await User.findAll({
+      where: {
+        id: { [Op.in]: restaurantIds },
+        type: 'Merchant'
+      },
+      attributes: ['id', 'restaurant_name', 'profile_image', 'restaurant_logo'],
+      raw: true
+    });
+
+    const restaurantMap = {};
+    restaurants.forEach(r => {
+      restaurantMap[r.id] = {
+        name: r.restaurant_name,
+        logo: r.restaurant_logo || r.profile_image || null
+      };
+    });
+
+    // Group transactions by day
+    const dayMap = new Map();
+    
+    weekTransactions.forEach((transaction) => {
+      const dateUsed = new Date(transaction.date_used);
+      const dateKey = dateUsed.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      if (!dayMap.has(dateKey)) {
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayName = dayNames[dateUsed.getDay()];
+        const formattedDate = `${String(dateUsed.getDate()).padStart(2, '0')}/${String(dateUsed.getMonth() + 1).padStart(2, '0')}/${dateUsed.getFullYear()}`;
+        
+        dayMap.set(dateKey, {
+          date: formattedDate,
+          dayName: dayName,
+          transactions: []
+        });
+      }
+      
+      const dayData = dayMap.get(dateKey);
+      const restaurant = restaurantMap[transaction.restaurant_id] || { name: 'Unknown Restaurant', logo: null };
+      
+      dayData.transactions.push({
+        id: transaction.id.toString(),
+        logo: restaurant.logo,
+        restaurant: restaurant.name,
+        order: dayData.transactions.length + 1
+      });
+    });
+
+    // Convert map to array and sort by date (newest first)
+    const weekData = Array.from(dayMap.values()).sort((a, b) => {
+      // Parse dates for comparison
+      const dateA = a.date.split('/').reverse().join('-');
+      const dateB = b.date.split('/').reverse().join('-');
+      return new Date(dateB) - new Date(dateA);
+    });
+
+    return {
+      totalVisits,
+      thisWeek,
+      weekData
+    };
+  } catch (error) {
+    console.log({ error, message: 'failed to get restaurants visited data' });
+    throw new Error(`Failed to get restaurants visited data: ${error.message}`);
+  }
+}
+
 // Get points earned data grouped by week
 async function getPointsEarnedData(clientId) {
   try {
@@ -824,5 +930,6 @@ module.exports = {
   getCustomers,
   getCustomerDetails,
   sharePoints,
-  getPointsEarnedData
+  getPointsEarnedData,
+  getRestaurantsVisitedData
 };

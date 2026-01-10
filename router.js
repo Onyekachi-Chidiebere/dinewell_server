@@ -59,6 +59,7 @@ router.get('/client/username/check', clientController.checkUsernameAvailability)
 router.post('/client/username/suggest', clientController.generateUsernameSuggestion);
 router.get('/client/:clientId/statistics', clientController.getStatistics);
 router.get('/client/:clientId/points-earned', clientController.getPointsEarnedData);
+router.get('/client/:clientId/restaurants-visited', clientController.getRestaurantsVisitedData);
 router.get('/client/customers', clientController.getCustomers);
 router.get('/client/customers/:customerId', clientController.getCustomerDetails);
 router.post('/client/:senderId/share-points', clientController.sharePoints);

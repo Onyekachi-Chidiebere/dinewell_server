@@ -288,3 +288,28 @@ exports.getPointsEarnedData = async (req, res) => {
     });
   }
 };
+
+// Get restaurants visited data for client
+exports.getRestaurantsVisitedData = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    
+    if (!clientId) {
+      return res.status(400).json({
+        error: 'Client ID is required'
+      });
+    }
+
+    const result = await clientService.getRestaurantsVisitedData(parseInt(clientId));
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({
+      error: err.message
+    });
+  }
+};
