@@ -919,6 +919,90 @@ async function getPointsEarnedData(clientId) {
   }
 }
 
+// Get restaurants visited by client with total points earned at each
+async function getVisitedRestaurants(clientId) {
+  try {
+    if (!clientId) throw new Error('clientId is required');
+
+    // Get all completed transactions for this client
+    const allTransactions = await Points.findAll({
+      where: {
+        customer_id: clientId,
+        status: 'completed',
+        type: 'issue' // Only count points earned (issued), not redeemed
+      },
+      attributes: ['restaurant_id', 'total_points'],
+      raw: true,
+    });
+
+    if (allTransactions.length === 0) {
+      return {
+        restaurants: []
+      };
+    }
+
+    // Group by restaurant and sum points
+    const restaurantPointsMap = {};
+    const restaurantIds = new Set();
+    
+    allTransactions.forEach(transaction => {
+      if (transaction.restaurant_id) {
+        restaurantIds.add(transaction.restaurant_id);
+        if (!restaurantPointsMap[transaction.restaurant_id]) {
+          restaurantPointsMap[transaction.restaurant_id] = 0;
+        }
+        restaurantPointsMap[transaction.restaurant_id] += transaction.total_points;
+      }
+    });
+
+    // Get restaurant details
+    const restaurants = await User.findAll({
+      where: {
+        id: { [Op.in]: Array.from(restaurantIds) },
+        type: 'Merchant'
+      },
+      attributes: [
+        'id',
+        'restaurant_name',
+        'restaurant_logo',
+        'profile_image',
+        'restaurant_images'
+      ],
+      raw: true
+    });
+
+    // Format restaurants with total points
+    const formattedRestaurants = restaurants.map(restaurant => {
+      const totalPoints = restaurantPointsMap[restaurant.id] || 0;
+      const restaurantImage = restaurant.restaurant_images && restaurant.restaurant_images.length > 0 
+        ? restaurant.restaurant_images[0] 
+        : restaurant.profile_image || null;
+      const restaurantLogo = restaurant.restaurant_logo || restaurant.profile_image || null;
+
+      return {
+        id: restaurant.id.toString(),
+        name: restaurant.restaurant_name || 'Unknown Restaurant',
+        location: 'Montreal, Canada', // Default location, can be updated if location field exists
+        image: restaurantImage,
+        logo: restaurantLogo,
+        rating: 4.5, // Default rating, can be updated if rating field exists
+        points: totalPoints,
+        category: 'Fine Dining' // Default category, can be updated if category field exists
+      };
+    });
+
+    // Sort by points earned (descending)
+    formattedRestaurants.sort((a, b) => b.points - a.points);
+
+    return {
+      restaurants: formattedRestaurants
+    };
+  } catch (error) {
+    console.log({ error, message: 'failed to get visited restaurants' });
+    throw new Error(`Failed to get visited restaurants: ${error.message}`);
+  }
+}
+
 // Get transaction history grouped by day (all transactions, not just this week)
 async function getTransactionHistory(clientId) {
   try {
@@ -1016,5 +1100,6 @@ module.exports = {
   sharePoints,
   getPointsEarnedData,
   getRestaurantsVisitedData,
-  getTransactionHistory
+  getTransactionHistory,
+  getVisitedRestaurants
 };
