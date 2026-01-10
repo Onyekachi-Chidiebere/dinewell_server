@@ -263,3 +263,28 @@ exports.sharePoints = async (req, res) => {
     });
   }
 };
+
+// Get points earned data for client
+exports.getPointsEarnedData = async (req, res) => {
+  try {
+    const { clientId } = req.params;
+    
+    if (!clientId) {
+      return res.status(400).json({
+        error: 'Client ID is required'
+      });
+    }
+
+    const result = await clientService.getPointsEarnedData(parseInt(clientId));
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({
+      error: err.message
+    });
+  }
+};
