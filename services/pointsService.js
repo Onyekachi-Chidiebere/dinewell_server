@@ -1,10 +1,15 @@
 const Points = require('../models/points');
 const { v4: uuidv4 } = require('uuid');
+const POINTS_RATE = {
+    issue: 10, // 10 points per doller
+    redeem: 500 // 500 points per dollar
+}
 
 /**
  * Calculate points based on price and points per dollar rate
  */
-function calculatePoints(price, pointsPerDollar = 10) {
+function calculatePoints(price, type) {
+    let pointsPerDollar = POINTS_RATE[type]
     return Math.round(price * pointsPerDollar);
 }
 
@@ -17,7 +22,6 @@ async function savePoints({
     customerId = null,
     dishes = [],
     totalPrice = 0,
-    pointsPerDollar = 10,
     notes = null
 }) {
 
@@ -33,7 +37,7 @@ async function savePoints({
 
         // Calculate total points
         const totalPoints = dishes.reduce((sum, dish) => {
-            const dishPoints = calculatePoints(dish.price, pointsPerDollar);
+            const dishPoints = calculatePoints(dish.price, type);
             return sum + (dishPoints * dish.quantity);
         }, 0);
 
@@ -212,7 +216,7 @@ async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
         // Build where clause based on filter type
         const baseWhere = { status: 'completed' };
         const filteredWhere = { ...baseWhere };
-        
+
         if (filterType === 'issued') {
             filteredWhere.type = 'issue';
         } else if (filterType === 'redeemed') {
