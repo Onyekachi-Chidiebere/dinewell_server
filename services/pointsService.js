@@ -53,11 +53,9 @@ async function savePoints({
             dishes: dishes,
             total_price: totalPrice,
             total_points: totalPoints,
-            points_per_dollar: pointsPerDollar,
             qr_code: qrCode,
             notes: notes
         });
-
         return {
             success: true,
             points: pointsRecord,
@@ -340,6 +338,13 @@ async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
     }
 }
 
+/**
+ * Get points rate configuration
+ */
+function getPointsRate() {
+    return POINTS_RATE;
+}
+
 module.exports = {
     savePoints,
     updatePoints,
@@ -348,5 +353,6 @@ module.exports = {
     getPointsByQrCode,
     issuePoints,// manages both issue and redeem points
     calculatePoints,
-    getPointsForAdmin
+    getPointsForAdmin,
+    getPointsRate
 };

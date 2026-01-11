@@ -12,7 +12,6 @@ exports.createPoints = async (req, res) => {
             customerId,
             dishes,
             totalPrice,
-            pointsPerDollar = 10,
             notes
         } = req.body;
 
@@ -48,7 +47,6 @@ exports.createPoints = async (req, res) => {
             customerId,
             dishes,
             totalPrice,
-            pointsPerDollar,
             notes
         });
 
@@ -252,6 +250,21 @@ exports.getPointsForAdmin = async (req, res) => {
         console.error('Get points for admin error:', err);
         res.status(400).json({ 
             error: err.message || 'Failed to get points for admin' 
+        });
+    }
+};
+
+/**
+ * Get points rate configuration
+ */
+exports.getPointsRate = async (req, res) => {
+    try {
+        const pointsRate = pointsService.getPointsRate();
+        res.json(pointsRate);
+    } catch (err) {
+        console.error('Get points rate error:', err);
+        res.status(400).json({ 
+            error: err.message || 'Failed to get points rate' 
         });
     }
 };

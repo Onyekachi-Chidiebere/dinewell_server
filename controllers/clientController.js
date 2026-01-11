@@ -24,9 +24,9 @@ exports.createClient = async (req, res) => {
       }
     } else {
       if (!email || !username || !name || !provider || !idToken) {
-        return res.status(400).json({ 
+      return res.status(400).json({ 
           error: 'Email, username, name, provider, and idToken are required' 
-        });
+      });
       }
     }
 
@@ -68,10 +68,10 @@ exports.signInClient = async (req, res) => {
       }
     } else {
       // For social provider authentication
-      if (!email || !provider || !idToken) {
-        return res.status(400).json({ 
-          error: 'Email, provider, and idToken are required' 
-        });
+    if (!email || !provider || !idToken) {
+      return res.status(400).json({ 
+        error: 'Email, provider, and idToken are required' 
+      });
       }
     }
 

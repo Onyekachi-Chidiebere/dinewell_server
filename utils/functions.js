@@ -5,7 +5,7 @@ function getTodayRange() {
     end.setHours(23, 59, 59, 999);
     return { start, end };
   }
-
+  
 function getCurrentWeekRange() {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
