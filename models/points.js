@@ -76,6 +76,19 @@ Points.init(
         notes: {
             type: DataTypes.TEXT,
             allowNull: true
+        },
+        paid: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false
+        },
+        payment_id: {
+            type: DataTypes.INTEGER,
+            allowNull: true,
+            references: {
+                model: 'payment',
+                key: 'id'
+            }
         }
     },
     {

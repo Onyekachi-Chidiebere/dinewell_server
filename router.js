@@ -10,6 +10,7 @@ const dishController = require('./controllers/dishController');
 const cardController = require('./controllers/cardController');
 const clientController = require('./controllers/clientController');
 const pointsController = require('./controllers/pointsController');
+const paymentController = require('./controllers/paymentController');
 const adminController = require('./controllers/adminController');
 const adminStatisticsController = require('./controllers/adminStatisticsController');
 const adminAuth = require('./utils/adminAuth');
@@ -77,6 +78,10 @@ router.post('/points/scan/:qrCode', pointsController.scanQrCode);
 router.get('/points/admin/list', pointsController.getPointsForAdmin);
 router.get('/rate', pointsController.getPointsRate);
 router.get('/restaurants/:restaurantId/points/history', pointsController.getPointsHistoryForMerchant);
+
+// Payment management routes
+router.get('/restaurants/:restaurantId/payments/history', paymentController.getPaymentHistory);
+router.post('/payments/process-daily', paymentController.processDailyPayments); // Admin/testing endpoint
 
 // Admin management routes
 router.post('/admin/login', adminController.adminLogin);
