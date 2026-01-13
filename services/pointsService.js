@@ -63,7 +63,7 @@ async function savePoints({
         };
     } catch (error) {
         console.error('Error saving points:', error);
-        throw new Error(`Failed to save points: ${error.message}`);
+        throw new Error(`${error.message}`);
     }
 }
 
@@ -93,6 +93,34 @@ async function updatePoints(pointsId, updateData) {
             updateFields.date_issued = new Date();
         }
 
+        //calculate user points balance
+        if (pointsRecord.type === 'redeem') {
+            const [customerIssuedRow] = await Points.findAll({
+                attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+                where: {
+                    customer_id: updateFields.customer_id,
+                    type: 'issue',
+                    status: 'completed'
+                },
+                raw: true,
+            });
+
+            const [customerRedeemedRow] = await Points.findAll({
+                attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+                where: {
+                    customer_id: updateFields.customer_id,
+                    type: 'redeem',
+                    status: 'completed'
+                },
+                raw: true,
+            });
+
+            const customerPointBalance = Number(customerIssuedRow?.sum || 0) - Number(customerRedeemedRow?.sum || 0);
+
+            if (customerPointBalance < pointsRecord.total_points) {
+                throw new Error('Insufficient points');
+            }
+        }
         // Update the record
         await pointsRecord.update(updateFields);
 
@@ -103,7 +131,7 @@ async function updatePoints(pointsId, updateData) {
         };
     } catch (error) {
         console.error('Error updating points:', error);
-        throw new Error(`Failed to update points: ${error.message}`);
+        throw new Error(`${error.message}`);
     }
 }
 
@@ -124,7 +152,7 @@ async function getPointsById(pointsId) {
         };
     } catch (error) {
         console.error('Error getting points:', error);
-        throw new Error(`Failed to get points: ${error.message}`);
+        throw new Error(`${error.message}`);
     }
 }
 
@@ -156,7 +184,7 @@ async function getPointsByRestaurant(restaurantId, options = {}) {
         };
     } catch (error) {
         console.error('Error getting points by restaurant:', error);
-        throw new Error(`Failed to get points by restaurant: ${error.message}`);
+        throw new Error(`${error.message}`);
     }
 }
 
@@ -179,7 +207,7 @@ async function getPointsByQrCode(qrCode) {
         };
     } catch (error) {
         console.error('Error getting points by QR code:', error);
-        throw new Error(`Failed to get points by QR code: ${error.message}`);
+        throw new Error(`${error.message}`);
     }
 }
 
@@ -197,7 +225,7 @@ async function issuePoints(pointsId, customerId = null) {
         return await updatePoints(pointsId, updateData);
     } catch (error) {
         console.error('Error issuing points:', error);
-        throw new Error(`Failed to issue points: ${error.message}`);
+        throw new Error(`${error.message}`);
     }
 }
 
@@ -334,7 +362,7 @@ async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
         };
     } catch (error) {
         console.error('Error getting points for admin:', error);
-        throw new Error(`Failed to get points for admin: ${error.message}`);
+        throw new Error(`${error.message}`);
     }
 }
 
@@ -343,6 +371,122 @@ async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
  */
 function getPointsRate() {
     return POINTS_RATE;
+}
+
+/**
+ * Get points transactions for merchant history (grouped by date)
+ */
+async function getPointsHistoryForMerchant(restaurantId, searchQuery = '') {
+    try {
+        const User = require('../models/user');
+        const { Op } = require('sequelize');
+        
+        const whereClause = { 
+            restaurant_id: restaurantId,
+            status: 'completed' // Only show completed transactions
+        };
+
+        // Get all completed transactions
+        const pointsRecords = await Points.findAll({
+            where: whereClause,
+            attributes: [
+                'id',
+                'customer_id',
+                'total_price',
+                'total_points',
+                'type',
+                'date_used',
+                'date_created'
+            ],
+            order: [['date_used', 'DESC']], // Order by date_used (completion date)
+            raw: true
+        });
+
+        if (pointsRecords.length === 0) {
+            return [];
+        }
+
+        // Get unique customer IDs
+        const customerIds = [...new Set(pointsRecords.map(p => p.customer_id).filter(Boolean))];
+
+        // Get customer names
+        const customers = customerIds.length > 0 ? await User.findAll({
+            where: {
+                id: { [Op.in]: customerIds },
+                type: 'Customer'
+            },
+            attributes: ['id', 'name', 'username'],
+            raw: true
+        }) : [];
+
+        // Create customer map
+        const customerMap = {};
+        customers.forEach(customer => {
+            customerMap[customer.id] = customer.name || customer.username || 'Unknown';
+        });
+
+        // Format and group by date
+        const dateMap = new Map();
+
+        pointsRecords.forEach(record => {
+            // Use date_used if available, otherwise date_created
+            const transactionDate = record.date_used || record.date_created;
+            const dateKey = new Date(transactionDate).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+
+            // Get customer name
+            const customerName = record.customer_id && customerMap[record.customer_id] 
+                ? customerMap[record.customer_id] 
+                : 'Anonymous';
+
+            // Filter by search query if provided
+            if (searchQuery) {
+                const searchLower = searchQuery.toLowerCase();
+                const matchesCustomer = customerName.toLowerCase().includes(searchLower);
+                const matchesType = record.type.toLowerCase().includes(searchLower);
+                if (!matchesCustomer && !matchesType) {
+                    return; // Skip this transaction if it doesn't match search
+                }
+            }
+
+            // Format transaction
+            const transaction = {
+                id: record.id,
+                amount: parseFloat(record.total_price) || 0,
+                points: record.total_points || 0,
+                type: record.type === 'issue' ? 'issued' : 'redeemed',
+                date: transactionDate.toISOString().split('T')[0],
+                customer: customerName
+            };
+
+            // Group by date
+            if (!dateMap.has(dateKey)) {
+                dateMap.set(dateKey, []);
+            }
+            dateMap.get(dateKey).push(transaction);
+        });
+
+        // Convert map to array format
+        const groupedTransactions = Array.from(dateMap.entries()).map(([date, transactions]) => ({
+            date,
+            transactions
+        }));
+
+        // Sort by date descending (most recent first)
+        groupedTransactions.sort((a, b) => {
+            const dateA = new Date(a.date.split('/').reverse().join('-'));
+            const dateB = new Date(b.date.split('/').reverse().join('-'));
+            return dateB - dateA;
+        });
+
+        return groupedTransactions;
+    } catch (error) {
+        console.error('Error getting points history for merchant:', error);
+        throw new Error(`${error.message}`);
+    }
 }
 
 module.exports = {
@@ -354,5 +498,6 @@ module.exports = {
     issuePoints,// manages both issue and redeem points
     calculatePoints,
     getPointsForAdmin,
-    getPointsRate
+    getPointsRate,
+    getPointsHistoryForMerchant
 };

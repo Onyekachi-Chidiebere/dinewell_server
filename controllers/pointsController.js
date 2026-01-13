@@ -268,3 +268,27 @@ exports.getPointsRate = async (req, res) => {
         });
     }
 };
+
+/**
+ * Get points history for merchant (grouped by date)
+ */
+exports.getPointsHistoryForMerchant = async (req, res) => {
+    try {
+        const { restaurantId } = req.params;
+        const { searchQuery = '' } = req.query;
+
+        if (!restaurantId) {
+            return res.status(400).json({ 
+                error: 'Restaurant ID is required' 
+            });
+        }
+
+        const result = await pointsService.getPointsHistoryForMerchant(restaurantId, searchQuery);
+        res.json(result);
+    } catch (err) {
+        console.error('Get points history for merchant error:', err);
+        res.status(400).json({ 
+            error: err.message || 'Failed to get points history' 
+        });
+    }
+};
