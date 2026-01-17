@@ -1,2 +1,9 @@
 .env
-/node_modules
+
+node_modules/
+
+.yarn-integrity
+
+yarn-error.log
+
+yarn-debug.log
