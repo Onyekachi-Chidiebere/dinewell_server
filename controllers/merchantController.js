@@ -47,6 +47,12 @@ exports.login = async (req, res) => {
       id: merchant.id,
       restaurant_name: merchant.restaurant_name,
       restaurant_logo: merchant.restaurant_logo || null,
+      name: merchant.name || null,
+      email: merchant.email || null,
+      phone: merchant.phone || null,
+      date_of_birth: merchant.date_of_birth || null,
+      gender: merchant.gender || null,
+      profile_image: merchant.profile_image || null,
     };
     res.json(response);
   } catch (err) {
@@ -83,5 +89,35 @@ exports.getRestaurantDetails = async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+exports.updateMerchantProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name, email, phone, restaurantName, dateOfBirth, gender } = req.body;
+    const profileImageFile = req.file; // Multer will attach the file here
+
+    const merchant = await merchantService.updateMerchantProfile({
+      userId,
+      name,
+      email,
+      phone,
+      restaurantName,
+      dateOfBirth,
+      gender,
+      profileImageFile
+    });
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      merchant
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({ 
+      error: err.message 
+    });
   }
 };

@@ -340,6 +340,54 @@ async function getRestaurantDetails(restaurantId) {
   };
 }
 
+async function updateMerchantProfile({ userId, name, email, phone, restaurantName, dateOfBirth, gender, profileImageFile }) {
+  try {
+    const user = await User.findByPk(userId);
+    if (!user) {
+      throw new Error('Merchant not found');
+    }
+
+    if (user.type !== 'Merchant') {
+      throw new Error('User is not a merchant');
+    }
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (phone) updateData.phone = phone;
+    if (restaurantName) updateData.restaurant_name = restaurantName;
+    if (dateOfBirth) updateData.date_of_birth = dateOfBirth;
+    if (gender) updateData.gender = gender;
+
+    // Handle profile image upload to Cloudinary
+    if (profileImageFile) {
+      try {
+        const imageUrl = await uploadBufferToCloudinary(
+          profileImageFile.buffer,
+          'merchant-profiles',
+          `profile-${userId}-${Date.now()}`,
+          profileImageFile.mimetype
+        );
+        updateData.profile_image = imageUrl;
+        // Also update restaurant_logo if it's the profile image
+        if (!user.restaurant_logo) {
+          updateData.restaurant_logo = imageUrl;
+        }
+      } catch (uploadError) {
+        console.error('Error uploading profile image to Cloudinary:', uploadError);
+        throw new Error('Failed to upload profile image');
+      }
+    }
+
+    await user.update(updateData);
+
+    return normalizeUserResponse(user);
+  } catch (error) {
+    console.log({ error, message: 'failed to update merchant profile' });
+    throw new Error(`Failed to update merchant profile: ${error.message}`);
+  }
+}
+
 module.exports = {
   saveDetails,
   saveAddress,
@@ -347,6 +395,7 @@ module.exports = {
   saveCard,
   login,
   merchantStatistics,
+  updateMerchantProfile,
   getRestaurants,
   getRestaurantDetails,
 };

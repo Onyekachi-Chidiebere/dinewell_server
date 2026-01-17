@@ -37,6 +37,7 @@ router.post('/merchant/login', merchantController.login);
 router.get('/merchant/:merchantId/statistics', merchantController.getStatistics);
 router.get('/merchant/restaurants', merchantController.getRestaurants);
 router.get('/merchant/restaurants/:restaurantId', merchantController.getRestaurantDetails);
+router.put('/merchant/profile/:userId', upload.single('profileImage'), merchantController.updateMerchantProfile);
 
 // Dish management routes
 router.post('/dishes', upload.single('dishImage'), dishController.createDish);
