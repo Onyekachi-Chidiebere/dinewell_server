@@ -98,6 +98,18 @@ exports.updateMerchantProfile = async (req, res) => {
     const { name, email, phone, restaurantName, dateOfBirth, gender } = req.body;
     const profileImageFile = req.file; // Multer will attach the file here
 
+    console.log('Update profile request:', {
+      userId,
+      body: req.body,
+      file: profileImageFile ? {
+        fieldname: profileImageFile.fieldname,
+        originalname: profileImageFile.originalname,
+        mimetype: profileImageFile.mimetype,
+        size: profileImageFile.size,
+        hasBuffer: !!profileImageFile.buffer
+      } : 'No file received'
+    });
+
     const merchant = await merchantService.updateMerchantProfile({
       userId,
       name,

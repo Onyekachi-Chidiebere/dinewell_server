@@ -42,7 +42,7 @@ router.put('/merchant/profile/:userId', upload.single('profileImage'), merchantC
 // Dish management routes
 router.post('/dishes', upload.single('dishImage'), dishController.createDish);
 router.get('/dishes/:id', dishController.getDish);
-router.get('/restaurants/:restaurantId/dishes', dishController.getRestaurantDishes);
+router.get(['/restaurants/:restaurantId/dishes','/restaurants/:restaurantId/dishes/:searchQuery'], dishController.getRestaurantDishes);
 router.put('/dishes/:id', upload.single('dishImage'), dishController.updateDish);
 router.delete('/dishes/:id', dishController.deleteDish);
 

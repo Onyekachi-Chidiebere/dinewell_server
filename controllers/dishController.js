@@ -34,9 +34,9 @@ exports.getDish = async (req, res) => {
 
 exports.getRestaurantDishes = async (req, res) => {
   try {
-    const { restaurantId } = req.params;
+    const { restaurantId, searchQuery } = req.params;
 
-    const dishes = await dishService.getDishesByRestaurant(restaurantId);
+    const dishes = await dishService.getDishesByRestaurant(restaurantId, searchQuery);
     res.json(dishes);
   } catch (err) {
     res.status(400).json({ error: err.message });

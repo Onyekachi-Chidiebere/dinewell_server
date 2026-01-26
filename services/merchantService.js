@@ -370,9 +370,9 @@ async function updateMerchantProfile({ userId, name, email, phone, restaurantNam
         );
         updateData.profile_image = imageUrl;
         // Also update restaurant_logo if it's the profile image
-        if (!user.restaurant_logo) {
-          updateData.restaurant_logo = imageUrl;
-        }
+       
+        updateData.restaurant_logo = imageUrl;
+        
       } catch (uploadError) {
         console.error('Error uploading profile image to Cloudinary:', uploadError);
         throw new Error('Failed to upload profile image');

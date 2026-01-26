@@ -1,6 +1,7 @@
 const Dish = require('../models/dish');
 const User = require('../models/user');
 const { uploadBufferToCloudinary } = require('../utils/cloudinary');
+const { Op } = require('sequelize');
 
 async function createDish(dishData, restaurantId, dishImageFile) {
   // Verify if the restaurant exists and is a merchant
@@ -43,12 +44,34 @@ async function getDishById(dishId, restaurantId) {
   return dish;
 }
 
-async function getDishesByRestaurant(restaurantId) {
-  const dishes = await Dish.findAll({
+async function getDishesByRestaurant(restaurantId, searchQuery) {
+  // Active dishes = total dishes for this restaurant (independent of search)
+  const allDishes = await Dish.findAll({
     where: { restaurant_id: restaurantId },
+  });
+  const activeDishes = allDishes.length;
+
+  // Apply optional search filter for the list we return
+  const whereClause = {
+    restaurant_id: restaurantId,
+  };
+
+  if (searchQuery) {
+    // Filter by dish_name containing the search query (case-insensitive)
+    whereClause.dish_name = {
+      [Op.iLike]: `%${searchQuery}%`,
+    };
+  }
+
+  const dishes = await Dish.findAll({
+    where: whereClause,
     order: [['date_created', 'DESC']],
   });
-  return dishes;
+
+  return {
+    dishes,
+    activeDishes,
+  };
 }
 
 async function updateDish(dishId, restaurantId, dishData, dishImageFile) {
