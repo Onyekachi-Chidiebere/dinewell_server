@@ -367,7 +367,8 @@ exports.getVisitedRestaurants = async (req, res) => {
 // Get all restaurants with total points issued
 exports.getAllRestaurants = async (req, res) => {
   try {
-    const result = await clientService.getAllRestaurants();
+    const { search } = req.query;
+    const result = await clientService.getAllRestaurants(search || '');
 
     res.json({
       success: true,

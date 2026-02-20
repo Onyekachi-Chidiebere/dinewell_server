@@ -920,14 +920,23 @@ async function getPointsEarnedData(clientId) {
 }
 
 // Get all restaurants with total points issued by each
-async function getAllRestaurants() {
+async function getAllRestaurants(searchQuery = '') {
   try {
+    // Build where clause with optional search
+    const whereClause = {
+      type: 'Merchant',
+      approval_status: 1 // Only approved restaurants
+    };
+
+    // Add search filter if searchQuery is provided
+    if (searchQuery && searchQuery.trim()) {
+      const searchTerm = searchQuery.trim();
+      whereClause.restaurant_name = { [Op.like]: `%${searchTerm}%` };
+    }
+
     // Get all merchants/restaurants
     const restaurants = await User.findAll({
-      where: {
-        type: 'Merchant',
-        approval_status: 1 // Only approved restaurants
-      },
+      where: whereClause,
       attributes: [
         'id',
         'restaurant_name',
