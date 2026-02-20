@@ -1013,16 +1013,16 @@ async function getAllRestaurants(searchQuery = '') {
 }
 
 // Get restaurants visited by client with total points earned at each
-async function getVisitedRestaurants(clientId) {
+async function getVisitedRestaurants(clientId, searchQuery = '') {
   try {
     if (!clientId) throw new Error('clientId is required');
 
-    // Get all completed transactions for this client
+    // Get all completed transactions for this client (both earned and redeemed points)
     const allTransactions = await Points.findAll({
       where: {
         customer_id: clientId,
         status: 'completed',
-        type: 'issue' // Only count points earned (issued), not redeemed
+        type: { [Op.in]: ['issue', 'redeem'] } // Include both earned and redeemed points
       },
       attributes: ['restaurant_id', 'total_points'],
       raw: true,
@@ -1048,18 +1048,28 @@ async function getVisitedRestaurants(clientId) {
       }
     });
 
+    // Build where clause for restaurant search
+    const restaurantWhereClause = {
+      id: { [Op.in]: Array.from(restaurantIds) },
+      type: 'Merchant'
+    };
+
+    // Add search filter if searchQuery is provided
+    if (searchQuery && searchQuery.trim()) {
+      const searchTerm = searchQuery.trim();
+      restaurantWhereClause.restaurant_name = { [Op.like]: `%${searchTerm}%` };
+    }
+
     // Get restaurant details
     const restaurants = await User.findAll({
-      where: {
-        id: { [Op.in]: Array.from(restaurantIds) },
-        type: 'Merchant'
-      },
+      where: restaurantWhereClause,
       attributes: [
         'id',
         'restaurant_name',
         'restaurant_logo',
         'profile_image',
-        'restaurant_images'
+        'restaurant_images',
+        'regions'
       ],
       raw: true
     });
@@ -1071,11 +1081,12 @@ async function getVisitedRestaurants(clientId) {
         ? restaurant.restaurant_images[0] 
         : restaurant.profile_image || null;
       const restaurantLogo = restaurant.restaurant_logo || restaurant.profile_image || null;
+      const location = restaurant.regions?.address?.location || restaurant.regions?.location || 'Montreal, Canada';
 
       return {
         id: restaurant.id.toString(),
         name: restaurant.restaurant_name || 'Unknown Restaurant',
-        location: 'Montreal, Canada', // Default location, can be updated if location field exists
+        location: location,
         image: restaurantImage,
         logo: restaurantLogo,
         rating: 4.5, // Default rating, can be updated if rating field exists

@@ -343,6 +343,7 @@ exports.getTransactionHistory = async (req, res) => {
 exports.getVisitedRestaurants = async (req, res) => {
   try {
     const { clientId } = req.params;
+    const { search } = req.query;
     
     if (!clientId) {
       return res.status(400).json({
@@ -350,7 +351,7 @@ exports.getVisitedRestaurants = async (req, res) => {
       });
     }
 
-    const result = await clientService.getVisitedRestaurants(parseInt(clientId));
+    const result = await clientService.getVisitedRestaurants(parseInt(clientId), search || '');
 
     res.json({
       success: true,
