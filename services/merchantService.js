@@ -133,7 +133,7 @@ async function merchantStatistics(merchantId) {
 
   // Recent 5 transactions
   const recent = await Points.findAll({
-    where: { restaurant_id: merchantId },
+    where: { restaurant_id: merchantId, status: 'completed' },
     order: [['date_used', 'DESC']],
     limit: 5,
     raw: true,

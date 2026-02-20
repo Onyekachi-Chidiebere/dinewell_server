@@ -1,7 +1,8 @@
 ### DineWell Admin API Endpoints
 
 # Base URL
-@baseUrl = https://api.dinewell.ca
+# @baseUrl = https://api.dinewell.ca
+@baseUrl = http://192.168.8.72:3010
 
 ### 1. Create Admin Account
 POST {{baseUrl}}/admin/create
