@@ -1,4 +1,6 @@
 const merchantService = require('../services/merchantService');
+const { generateOTP, storeOTP, verifyOTP } = require('../utils/otpService');
+const { sendOTPEmail } = require('../utils/emailService');
 
 exports.signupDetails = async (req, res) => {
   try {
@@ -156,6 +158,80 @@ exports.changePassword = async (req, res) => {
     res.json({
       success: true,
       message: result.message
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({ 
+      error: err.message 
+    });
+  }
+};
+
+exports.sendPasswordResetOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if merchant exists with this email
+    const merchant = await merchantService.findMerchantByEmail(email);
+    if (!merchant) {
+      // Don't reveal if email exists or not for security
+      return res.json({
+        success: true,
+        message: 'If the email exists, an OTP has been sent'
+      });
+    }
+
+    // Generate and store OTP
+    const otp = generateOTP();
+    storeOTP(email.toLowerCase(), otp);
+
+    // Send OTP via email
+    await sendOTPEmail(email, otp);
+
+    res.json({
+      success: true,
+      message: 'OTP has been sent to your email'
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(500).json({ 
+      error: 'Failed to send OTP. Please try again later.'
+    });
+  }
+};
+
+exports.verifyPasswordResetOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and OTP are required' });
+    }
+
+    // Verify OTP
+    const isValid = verifyOTP(email.toLowerCase(), otp);
+
+    if (!isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid or expired OTP. Please request a new one.' 
+      });
+    }
+
+    // Get merchant info for the reset password screen
+    const merchant = await merchantService.findMerchantByEmail(email);
+    if (!merchant) {
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully',
+      merchantId: merchant.id,
+      email: merchant.email
     });
   } catch (err) {
     console.log({ err });

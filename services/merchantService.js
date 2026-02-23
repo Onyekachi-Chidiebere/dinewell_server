@@ -82,6 +82,16 @@ async function login({ email, password }) {
   return normalizeUserResponse(user);
 }
 
+async function findMerchantByEmail(email) {
+  const user = await User.findOne({ 
+    where: { 
+      email: email.toLowerCase(),
+      type: 'Merchant'
+    } 
+  });
+  return user ? normalizeUserResponse(user) : null;
+}
+
 
 async function merchantStatistics(merchantId) {
   if (!merchantId) throw new Error('merchantId is required');
@@ -440,6 +450,7 @@ module.exports = {
   savePictures,
   saveCard,
   login,
+  findMerchantByEmail,
   merchantStatistics,
   updateMerchantProfile,
   updateMerchantPassword,

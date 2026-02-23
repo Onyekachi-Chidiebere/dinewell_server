@@ -34,6 +34,8 @@ router.post(
 );
 router.post('/merchant/signup/card', merchantController.signupCard);
 router.post('/merchant/login', merchantController.login);
+router.post('/merchant/forgot-password/send-otp', merchantController.sendPasswordResetOTP);
+router.post('/merchant/forgot-password/verify-otp', merchantController.verifyPasswordResetOTP);
 router.get('/merchant/:merchantId/statistics', merchantController.getStatistics);
 router.get('/merchant/restaurants', merchantController.getRestaurants);
 router.get('/merchant/restaurants/:restaurantId', merchantController.getRestaurantDetails);
