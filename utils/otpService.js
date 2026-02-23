@@ -1,9 +1,12 @@
 // In-memory storage for OTPs
 // In production, consider using Redis or a database
 const otpStore = new Map();
+const verifiedEmails = new Map(); // Store verified emails with expiration
 
 // OTP expiration time: 10 minutes
 const OTP_EXPIRY_TIME = 10 * 60 * 1000; // 10 minutes in milliseconds
+// Verification token expiration: 15 minutes (allows time to reset password after OTP verification)
+const VERIFICATION_TOKEN_EXPIRY = 15 * 60 * 1000; // 15 minutes in milliseconds
 
 /**
  * Generate a random 5-digit OTP
@@ -57,6 +60,15 @@ function verifyOTP(email, otp) {
 
   // OTP is valid - remove it after verification (one-time use)
   otpStore.delete(emailKey);
+  
+  // Store verification token for password reset (expires in 15 minutes)
+  const verificationExpiry = Date.now() + VERIFICATION_TOKEN_EXPIRY;
+  verifiedEmails.set(emailKey, {
+    verified: true,
+    expiryTime: verificationExpiry,
+    verifiedAt: Date.now()
+  });
+  
   return true;
 }
 
@@ -90,13 +102,48 @@ function removeOTP(email) {
 }
 
 /**
- * Clean up expired OTPs from storage
+ * Check if email was verified (OTP was successfully verified)
+ * @param {string} email - Email address
+ * @returns {boolean} - True if email was verified and token is still valid
+ */
+function isEmailVerified(email) {
+  const emailKey = email.toLowerCase();
+  const verificationData = verifiedEmails.get(emailKey);
+
+  if (!verificationData) {
+    return false;
+  }
+
+  // Check if verification token has expired
+  if (Date.now() > verificationData.expiryTime) {
+    verifiedEmails.delete(emailKey);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Remove verification token (after password reset is complete)
+ * @param {string} email - Email address
+ */
+function removeVerificationToken(email) {
+  verifiedEmails.delete(email.toLowerCase());
+}
+
+/**
+ * Clean up expired OTPs and verification tokens from storage
  */
 function cleanupExpiredOTPs() {
   const now = Date.now();
   for (const [email, data] of otpStore.entries()) {
     if (now > data.expiryTime) {
       otpStore.delete(email);
+    }
+  }
+  for (const [email, data] of verifiedEmails.entries()) {
+    if (now > data.expiryTime) {
+      verifiedEmails.delete(email);
     }
   }
 }
@@ -110,4 +157,6 @@ module.exports = {
   verifyOTP,
   hasValidOTP,
   removeOTP,
+  isEmailVerified,
+  removeVerificationToken,
 };

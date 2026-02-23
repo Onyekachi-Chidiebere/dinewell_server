@@ -396,6 +396,49 @@ async function updateMerchantPassword(merchantId, currentPassword, newPassword) 
   }
 }
 
+async function resetMerchantPassword(merchantId, newPassword) {
+  try {
+    // Validate input
+    if (!newPassword) {
+      throw new Error('New password is required');
+    }
+
+    if (newPassword.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+
+    // Find merchant
+    const merchant = await User.findOne({
+      where: {
+        id: merchantId,
+        type: 'Merchant'
+      }
+    });
+
+    if (!merchant) {
+      throw new Error('Merchant not found');
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await merchant.update({
+      password: hashedNewPassword
+    });
+
+    return {
+      success: true,
+      message: 'Password reset successfully'
+    };
+
+  } catch (error) {
+    console.error('Reset merchant password error:', error);
+    throw error;
+  }
+}
+
 async function updateMerchantProfile({ userId, name, email, phone, restaurantName, dateOfBirth, gender, profileImageFile }) {
   try {
     const user = await User.findByPk(userId);
@@ -454,6 +497,7 @@ module.exports = {
   merchantStatistics,
   updateMerchantProfile,
   updateMerchantPassword,
+  resetMerchantPassword,
   getRestaurants,
   getRestaurantDetails,
 };

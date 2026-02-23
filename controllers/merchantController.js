@@ -1,5 +1,5 @@
 const merchantService = require('../services/merchantService');
-const { generateOTP, storeOTP, verifyOTP } = require('../utils/otpService');
+const { generateOTP, storeOTP, verifyOTP, isEmailVerified, removeVerificationToken } = require('../utils/otpService');
 const { sendOTPEmail } = require('../utils/emailService');
 
 exports.signupDetails = async (req, res) => {
@@ -232,6 +232,47 @@ exports.verifyPasswordResetOTP = async (req, res) => {
       message: 'OTP verified successfully',
       merchantId: merchant.id,
       email: merchant.email
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({ 
+      error: err.message 
+    });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { merchantId, email, newPassword } = req.body;
+
+    if (!merchantId || !email || !newPassword) {
+      return res.status(400).json({ error: 'Merchant ID, email, and new password are required' });
+    }
+
+    // Verify that email was verified via OTP (within last 15 minutes)
+    if (!isEmailVerified(email)) {
+      return res.status(400).json({ 
+        error: 'OTP verification expired or not verified. Please verify OTP again.' 
+      });
+    }
+
+    // Validate password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    // Reset password
+    const result = await merchantService.resetMerchantPassword(
+      parseInt(merchantId),
+      newPassword
+    );
+
+    // Remove verification token after successful password reset
+    removeVerificationToken(email);
+
+    res.json({
+      success: true,
+      message: result.message
     });
   } catch (err) {
     console.log({ err });
