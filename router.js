@@ -59,6 +59,10 @@ router.get('/cards', cardController.list);
 // Client management routes
 router.post('/client/signup', clientController.createClient);
 router.post('/client/signin', clientController.signInClient);
+router.post('/client/forgot-password/send-otp', clientController.sendPasswordResetOTP);
+router.post('/client/forgot-password/verify-otp', clientController.verifyPasswordResetOTP);
+router.post('/client/forgot-password/reset', clientController.resetPassword);
+router.put('/client/:customerId/password', clientController.changePassword);
 router.get('/client/profile/:userId', clientController.getClientProfile);
 router.put('/client/profile/:userId', upload.single('profileImage'), clientController.updateClientProfile);
 router.get('/client/username/check', clientController.checkUsernameAvailability);

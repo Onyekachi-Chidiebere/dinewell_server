@@ -44,17 +44,20 @@ function verifyOTP(email, otp) {
   const storedData = otpStore.get(emailKey);
 
   if (!storedData) {
+    console.log('No OTP found for this mail')
     return false; // No OTP found for this email
   }
 
   // Check if OTP has expired
   if (Date.now() > storedData.expiryTime) {
+    console.log('OTP has expired')
     otpStore.delete(emailKey); // Remove expired OTP
     return false;
   }
 
   // Verify OTP matches
   if (storedData.otp !== otp) {
+    console.log('OTP doesnt match')
     return false; // OTP doesn't match
   }
 
@@ -69,6 +72,7 @@ function verifyOTP(email, otp) {
     verifiedAt: Date.now()
   });
   
+  console.log('OTP verification successful')
   return true;
 }
 

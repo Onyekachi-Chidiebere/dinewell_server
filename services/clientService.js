@@ -7,6 +7,11 @@ const Points = require('../models/points');
 const { getTodayRange, getCurrentWeekRange } = require('../utils/functions');
 const { uploadBufferToCloudinary } = require('../utils/cloudinary');
 
+function normalizeUserResponse(userInstance) {
+  const user = userInstance.get({ plain: true });
+  delete user.password;
+  return user;
+}
 // Generate a unique username if the provided one is taken
 async function generateUniqueUsername(baseUsername) {
   let username = baseUsername.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -203,7 +208,103 @@ async function signInClient({ email, provider, idToken, password }) {
     throw new Error(`${error.message}`);
   }
 }
+async function findCustomerByEmail(email) {
+  const user = await User.findOne({ 
+    where: { 
+      email: email.toLowerCase(),
+      type: 'Customer'
+    } 
+  });
+  return user ? normalizeUserResponse(user) : null;
+}
+async function updateCustomerPassword(customerId, currentPassword, newPassword) {
+  try {
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      throw new Error('Current password and new password are required');
+    }
 
+    // Find customer
+    const customer = await User.findOne({
+      where: {
+        id: customerId,
+        type: 'Customer'
+      }
+    });
+
+    if (!customer) {
+      throw new Error('Customer not found');
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, customer.password);
+    
+    if (!isCurrentPasswordValid) {
+      throw new Error('Current password is incorrect');
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await customer.update({
+      password: hashedNewPassword
+    });
+
+    return {
+      success: true,
+      message: 'Password updated successfully'
+    };
+
+  } catch (error) {
+    console.error('Update customer password error:', error);
+    throw error;
+  }
+}
+
+async function resetCustomerPassword(customerId, newPassword) {
+  try {
+    // Validate input
+    if (!newPassword) {
+      throw new Error('New password is required');
+    }
+
+    if (newPassword.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+
+    // Find customer
+    const customer = await User.findOne({
+      where: {
+        id: customerId,
+        type: 'Customer'
+      }
+    });
+
+    if (!customer) {
+      throw new Error('Customer not found');
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await customer.update({
+      password: hashedNewPassword
+    });
+
+    return {
+      success: true,
+      message: 'Password reset successfully'
+    };
+
+  } catch (error) {
+    console.error('Reset customer password error:', error);
+    throw error;
+  }
+}
 // Update client profile
 async function updateClientProfile({ userId, username, dateOfBirth, gender, name, profileImageFile }) {
   try {
@@ -1107,6 +1208,7 @@ async function getVisitedRestaurants(clientId, searchQuery = '') {
   }
 }
 
+
 // Get transaction history grouped by day (all transactions, not just this week)
 async function getTransactionHistory(clientId) {
   try {
@@ -1206,5 +1308,8 @@ module.exports = {
   getRestaurantsVisitedData,
   getTransactionHistory,
   getVisitedRestaurants,
-  getAllRestaurants
+  getAllRestaurants,
+  findCustomerByEmail,
+  resetCustomerPassword,
+  updateCustomerPassword
 };

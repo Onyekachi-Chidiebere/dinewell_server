@@ -1,4 +1,6 @@
 const clientService = require('../services/clientService');
+const { sendOTPEmail } = require('../utils/emailService');
+const { generateOTP, storeOTP, verifyOTP, isEmailVerified, removeVerificationToken } = require('../utils/otpService');
 
 // Create new client account
 exports.createClient = async (req, res) => {
@@ -212,6 +214,151 @@ exports.getStatistics = async (req, res) => {
   }
 };
 
+exports.changePassword = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!customerId) {
+      return res.status(400).json({ error: 'Customer ID is required' });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    const result = await clientService.updateCustomerPassword(
+      parseInt(customerId),
+      currentPassword,
+      newPassword
+    );
+
+    res.json({
+      success: true,
+      message: result.message
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({ 
+      error: err.message 
+    });
+  }
+};
+
+exports.sendPasswordResetOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Check if client exists with this email
+    const customer = await clientService.findCustomerByEmail(email);
+    if (!customer) {
+      // Don't reveal if email exists or not for security
+      return res.json({
+        success: true,
+        message: 'If the email exists, an OTP has been sent'
+      });
+    }
+
+    // Generate and store OTP
+    const otp = generateOTP();
+    storeOTP(email.toLowerCase(), otp);
+
+    // Send OTP via email
+    await sendOTPEmail(email, otp);
+
+    res.json({
+      success: true,
+      message: 'OTP has been sent to your email'
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(500).json({ 
+      error: 'Failed to send OTP. Please try again later.'
+    });
+  }
+};
+
+exports.verifyPasswordResetOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and OTP are required' });
+    }
+
+    // Verify OTP
+    const isValid = verifyOTP(email.toLowerCase(), otp);
+
+    if (!isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid or expired OTP. Please request a new one.' 
+      });
+    }
+
+    // Get Cusromer info for the reset password screen
+    const customer = await clientService.findCustomerByEmail(email);
+    if (!customer) {
+      return res.status(404).json({ error: 'Cutomer not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'OTP verified successfully',
+      customerId: customer.id,
+      email: customer.email
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({ 
+      error: err.message 
+    });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { customerId, email, newPassword } = req.body;
+
+    if (!customerId || !email || !newPassword) {
+      return res.status(400).json({ error: 'Customer ID, email, and new password are required' });
+    }
+
+    // Verify that email was verified via OTP (within last 15 minutes)
+    if (!isEmailVerified(email)) {
+      return res.status(400).json({ 
+        error: 'OTP verification expired or not verified. Please verify OTP again.' 
+      });
+    }
+
+    // Validate password length
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+    }
+
+    // Reset password
+    const result = await clientService.resetCustomerPassword(
+      parseInt(customerId),
+      newPassword
+    );
+
+    // Remove verification token after successful password reset
+    removeVerificationToken(email);
+
+    res.json({
+      success: true,
+      message: result.message
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({ 
+      error: err.message 
+    });
+  }
+};
 exports.getCustomers = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
