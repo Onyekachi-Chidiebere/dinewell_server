@@ -340,6 +340,52 @@ async function getRestaurantDetails(restaurantId) {
   };
 }
 
+async function updateMerchantPassword(merchantId, currentPassword, newPassword) {
+  try {
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      throw new Error('Current password and new password are required');
+    }
+
+    // Find merchant
+    const merchant = await User.findOne({
+      where: {
+        id: merchantId,
+        type: 'Merchant'
+      }
+    });
+
+    if (!merchant) {
+      throw new Error('Merchant not found');
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, merchant.password);
+    
+    if (!isCurrentPasswordValid) {
+      throw new Error('Current password is incorrect');
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await merchant.update({
+      password: hashedNewPassword
+    });
+
+    return {
+      success: true,
+      message: 'Password updated successfully'
+    };
+
+  } catch (error) {
+    console.error('Update merchant password error:', error);
+    throw error;
+  }
+}
+
 async function updateMerchantProfile({ userId, name, email, phone, restaurantName, dateOfBirth, gender, profileImageFile }) {
   try {
     const user = await User.findByPk(userId);
@@ -396,6 +442,7 @@ module.exports = {
   login,
   merchantStatistics,
   updateMerchantProfile,
+  updateMerchantPassword,
   getRestaurants,
   getRestaurantDetails,
 };

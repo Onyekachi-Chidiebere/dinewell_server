@@ -133,3 +133,34 @@ exports.updateMerchantProfile = async (req, res) => {
     });
   }
 };
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { merchantId } = req.params;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!merchantId) {
+      return res.status(400).json({ error: 'Merchant ID is required' });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    const result = await merchantService.updateMerchantPassword(
+      parseInt(merchantId),
+      currentPassword,
+      newPassword
+    );
+
+    res.json({
+      success: true,
+      message: result.message
+    });
+  } catch (err) {
+    console.log({ err });
+    res.status(400).json({ 
+      error: err.message 
+    });
+  }
+};
