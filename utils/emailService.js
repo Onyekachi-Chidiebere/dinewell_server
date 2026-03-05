@@ -25,8 +25,8 @@ async function sendOTPEmail(email, otp) {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #F6BD87 0%, #FFF6ED 100%); padding: 30px; border-radius: 10px; text-align: center;">
-            <h1 style="color: #454B5E; margin: 0 0 20px 0;">Password Reset Request</h1>
-            <p style="color: #454B5E; font-size: 16px; margin: 0 0 30px 0;">
+            <h1 style="color: #000000; margin: 0 0 20px 0;">Password Reset Request</h1>
+            <p style="color: #000000; font-size: 16px; margin: 0 0 30px 0;">
               You have requested to reset your password. Please use the OTP code below:
             </p>
             <div style="background: #FFFFFF; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -34,10 +34,10 @@ async function sendOTPEmail(email, otp) {
                 ${otp}
               </h2>
             </div>
-            <p style="color: #8B8B9A; font-size: 14px; margin: 20px 0 0 0;">
+            <p style="color: #000000; font-size: 14px; margin: 20px 0 0 0;">
               This OTP will expire in 10 minutes.
             </p>
-            <p style="color: #8B8B9A; font-size: 12px; margin: 20px 0 0 0;">
+            <p style="color: #000000; font-size: 12px; margin: 20px 0 0 0;">
               If you didn't request this, please ignore this email.
             </p>
           </div>
