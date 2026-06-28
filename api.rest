@@ -2,7 +2,7 @@
 
 # Base URL
 # @baseUrl = https://api.dinewell.ca
-@baseUrl = http://192.168.8.72:3010
+@baseUrl = http://192.168.8.120:3010
 
 POST {{baseUrl}}/merchant/forgot-password/send-otp
 Content-Type: application/json

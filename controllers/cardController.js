@@ -6,6 +6,7 @@ exports.addCard = async (req, res) => {
     const card = await cardService.addCard({ userId, paymentMethodId });
     res.status(201).json(card);
   } catch (err) {
+    console.log({ err })
     res.status(400).json({ error: err.message });
   }
 };

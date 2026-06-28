@@ -2,15 +2,40 @@ const Stripe = require('stripe');
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/user');
 
-async function ensureCustomer(user) {
-  if (user.stripe_id) return user.stripe_id;
-  const customer = await stripe.customers.create({
-    name: user.restaurant_name || `${user.firstname || ''} ${user.lastname || ''}`.trim(),
-    email: user.email,
+function getCustomerDetails(user) {
+  return {
+    name: user.restaurant_name || `${user.firstname || ''} ${user.lastname || ''}`.trim() || undefined,
+    email: user.email || undefined,
     metadata: { user_id: String(user.id) },
-  });
+  };
+}
+
+async function createStripeCustomer(user) {
+  const customer = await stripe.customers.create(getCustomerDetails(user));
   await user.update({ stripe_id: customer.id });
   return customer.id;
+}
+
+async function ensureCustomer(user) {
+  if (user.stripe_id) {
+    try {
+      const customer = await stripe.customers.retrieve(user.stripe_id);
+
+      if (customer.deleted) {
+        return createStripeCustomer(user);
+      }
+
+      return user.stripe_id;
+    } catch (err) {
+      // Stale ID (wrong Stripe mode/account, deleted in dashboard, etc.)
+      if (err.code === 'resource_missing' || err.statusCode === 404) {
+        return createStripeCustomer(user);
+      }
+      throw err;
+    }
+  }
+
+  return createStripeCustomer(user);
 }
 
 async function addCard({ userId, paymentMethodId }) {
