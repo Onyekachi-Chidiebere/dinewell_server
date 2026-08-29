@@ -32,6 +32,9 @@ router.post(
   ]),
   merchantController.signupPictures
 );
+router.post('/merchant/signup/pictures-base64', merchantController.signupPicturesBase64);
+router.post('/merchant/signup/complete', merchantController.completeSignup);
+router.get('/merchant/signup/progress', merchantController.getSignupProgress);
 router.post('/merchant/signup/card', merchantController.signupCard);
 router.post('/merchant/login', merchantController.login);
 router.post('/merchant/forgot-password/send-otp', merchantController.sendPasswordResetOTP);

@@ -4,30 +4,131 @@ const { sendOTPEmail } = require('../utils/emailService');
 
 exports.signupDetails = async (req, res) => {
   try {
-    const merchantId = await merchantService.saveDetails(req.body);
-    res.json({ merchantId });
+    const result = await merchantService.saveDetails(req.body);
+    res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-exports.signupAddress = (req, res) => {
+exports.signupAddress = async (req, res) => {
   try {
-    merchantService.saveAddress(req.body);
-    res.json({ success: true });
+    await merchantService.saveAddress(req.body);
+    res.json({ success: true, nextScreen: 'RestaurantPictures' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
+function fileFromBase64(part, fallbackName) {
+  if (!part?.base64) return null;
+  const raw = String(part.base64).replace(/^data:[^;]+;base64,/, '');
+  const buffer = Buffer.from(raw, 'base64');
+  if (!buffer.length) return null;
+  return {
+    buffer,
+    originalname: part.fileName || fallbackName,
+    mimetype: part.type || part.mimeType || 'image/jpeg',
+  };
+}
 
 exports.signupPictures = async (req, res) => {
   try {
-    // logo: req.files.logo (single), restaurantImages: req.files.restaurantImages (array)
-    const { merchantId } = req.body;
+    // Multer puts text fields on req.body; also accept query as fallback
+    const merchantId = req.body?.merchantId || req.query?.merchantId;
+    console.log('signupPictures body keys:', Object.keys(req.body || {}), {
+      merchantId,
+      logoCount: req.files?.logo?.length || 0,
+      imageCount: req.files?.restaurantImages?.length || 0,
+    });
+    if (!merchantId) {
+      return res.status(400).json({
+        error: 'merchantId is required',
+        receivedBodyKeys: Object.keys(req.body || {}),
+        hasFiles: !!req.files,
+      });
+    }
     const logo = req.files && req.files.logo ? req.files.logo[0] : null;
     const restaurantImages = req.files && req.files.restaurantImages ? req.files.restaurantImages : [];
-    await merchantService.savePictures({ merchantId, logo, restaurantImages });
-    res.json({ success: true });
+    const validLogo = logo && logo.buffer && logo.buffer.length > 0 ? logo : null;
+    const validImages = (restaurantImages || []).filter(
+      (img) => img && img.buffer && img.buffer.length > 0
+    );
+    await merchantService.savePictures({
+      merchantId,
+      logo: validLogo,
+      restaurantImages: validImages,
+    });
+    res.json({ success: true, nextScreen: 'Login' });
+  } catch (err) {
+    console.error('signupPictures error:', err);
+    res.status(400).json({ error: err.message || 'Failed to upload pictures' });
+  }
+};
+
+/**
+ * JSON/base64 upload path — used by React Native Android where multipart FormData
+ * often fails with ERR_NETWORK even though JSON login/signup works.
+ */
+exports.signupPicturesBase64 = async (req, res) => {
+  try {
+    const started = Date.now();
+    const { merchantId, logo, restaurantImages } = req.body || {};
+    console.log('[signupPicturesBase64] incoming', {
+      merchantId,
+      hasLogo: !!logo?.base64,
+      imageCount: Array.isArray(restaurantImages) ? restaurantImages.length : 0,
+      contentLength: req.headers['content-length'],
+    });
+    if (!merchantId) {
+      return res.status(400).json({ error: 'merchantId is required' });
+    }
+    const validLogo = fileFromBase64(logo, 'logo.jpg');
+    const validImages = (Array.isArray(restaurantImages) ? restaurantImages : [])
+      .map((img, idx) => fileFromBase64(img, `image${idx}.jpg`))
+      .filter(Boolean);
+
+    if (!validLogo && validImages.length === 0) {
+      return res.status(400).json({ error: 'Please include a logo or at least one restaurant picture' });
+    }
+
+    await merchantService.savePictures({
+      merchantId,
+      logo: validLogo,
+      restaurantImages: validImages,
+    });
+    console.log('[signupPicturesBase64] ok', { ms: Date.now() - started });
+    res.json({ success: true, nextScreen: 'Login' });
+  } catch (err) {
+    console.error('signupPicturesBase64 error:', err);
+    res.status(400).json({ error: err.message || 'Failed to upload pictures' });
+  }
+};
+
+exports.completeSignup = async (req, res) => {
+  try {
+    const { merchantId } = req.body;
+    if (!merchantId) {
+      return res.status(400).json({ error: 'merchantId is required' });
+    }
+    const progress = await merchantService.completeSignup({ merchantId });
+    res.json({ success: true, ...progress, nextScreen: 'Login' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.getSignupProgress = async (req, res) => {
+  try {
+    const { email, merchantId } = req.query;
+    if (!email && !merchantId) {
+      return res.status(400).json({ error: 'email or merchantId is required' });
+    }
+    const progress = await merchantService.getSignupProgress({ email, merchantId });
+    if (!progress) {
+      return res.json({ found: false });
+    }
+    res.json({ found: true, ...progress });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -58,6 +159,13 @@ exports.login = async (req, res) => {
     };
     res.json(response);
   } catch (err) {
+    if (err.code === 'SIGNUP_INCOMPLETE' && err.signupProgress) {
+      return res.status(403).json({
+        error: err.message,
+        code: 'SIGNUP_INCOMPLETE',
+        signupProgress: err.signupProgress,
+      });
+    }
     res.status(400).json({ error: err.message });
   }
 };

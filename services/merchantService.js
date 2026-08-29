@@ -12,26 +12,148 @@ function normalizeUserResponse(userInstance) {
   return user;
 }
 
+const SIGNUP_STEPS = {
+  DETAILS: 'details',
+  ADDRESS: 'address',
+  PICTURES: 'pictures',
+  COMPLETE: 'complete',
+};
+
+function getRegionsObject(user) {
+  if (!user?.regions) return {};
+  if (typeof user.regions === 'object' && !Array.isArray(user.regions)) {
+    return { ...user.regions };
+  }
+  return {};
+}
+
+function getSignupStep(user) {
+  const regions = getRegionsObject(user);
+  if (regions.signup_step) return regions.signup_step;
+  // Derive from data for older rows
+  const address = regions.address || {};
+  const hasAddress = !!(address.streetNumber && address.streetName && address.area);
+  const hasPictures =
+    !!user.restaurant_logo ||
+    (Array.isArray(user.restaurant_images) && user.restaurant_images.length > 0);
+  if (hasPictures) return SIGNUP_STEPS.COMPLETE;
+  if (hasAddress) return SIGNUP_STEPS.PICTURES;
+  return SIGNUP_STEPS.ADDRESS;
+}
+
+function nextScreenForStep(step) {
+  switch (step) {
+    case SIGNUP_STEPS.DETAILS:
+      return 'RestaurantDetails';
+    case SIGNUP_STEPS.ADDRESS:
+      return 'RestaurantAddress';
+    case SIGNUP_STEPS.PICTURES:
+      return 'RestaurantPictures';
+    case SIGNUP_STEPS.COMPLETE:
+      return 'Login';
+    default:
+      return 'RestaurantDetails';
+  }
+}
+
+function buildSignupProgress(user) {
+  const regions = getRegionsObject(user);
+  const address = regions.address || {};
+  const step = getSignupStep(user);
+  return {
+    merchantId: user.id,
+    email: user.email,
+    signupStep: step,
+    nextScreen: nextScreenForStep(step),
+    completed: step === SIGNUP_STEPS.COMPLETE,
+    restaurantDetails: {
+      name: user.restaurant_name || '',
+      phone: user.phone || '',
+      email: user.email || '',
+      location: address.location || '',
+      streetNumber: address.streetNumber || '',
+      streetName: address.streetName || '',
+      area: address.area || '',
+      restaurantLogo: user.restaurant_logo || null,
+      restaurantImages: Array.isArray(user.restaurant_images) ? user.restaurant_images : [],
+    },
+  };
+}
+
 async function saveDetails({ name, phone, email, location, password }) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) throw new Error('Email is required');
+
+  const existing = await User.findOne({
+    where: { email: normalizedEmail, type: 'Merchant' },
+  });
+
   const hashedPassword = await bcrypt.hash(password, 10);
+
+  if (existing) {
+    const step = getSignupStep(existing);
+    if (step === SIGNUP_STEPS.COMPLETE) {
+      throw new Error('An account with this email already exists. Please log in.');
+    }
+    // Resume: update details for incomplete signup without rolling progress backward
+    const regions = getRegionsObject(existing);
+    const address = { ...(regions.address || {}), location };
+    const nextStep =
+      step === SIGNUP_STEPS.PICTURES ? SIGNUP_STEPS.PICTURES : SIGNUP_STEPS.ADDRESS;
+    await existing.update({
+      restaurant_name: name,
+      phone,
+      email: normalizedEmail,
+      password: hashedPassword,
+      regions: {
+        ...regions,
+        address,
+        signup_step: nextStep,
+      },
+    });
+    return {
+      merchantId: existing.id,
+      signupStep: nextStep,
+      nextScreen: nextScreenForStep(nextStep),
+    };
+  }
+
   const user = await User.create({
     restaurant_name: name,
     phone,
-    email,
+    email: normalizedEmail,
     password: hashedPassword,
     type: 'Merchant',
     date_created: new Date(),
-    regions: { address: { location } },
+    regions: {
+      address: { location },
+      signup_step: SIGNUP_STEPS.ADDRESS,
+    },
   });
-  return user.id;
+  return {
+    merchantId: user.id,
+    signupStep: SIGNUP_STEPS.ADDRESS,
+    nextScreen: nextScreenForStep(SIGNUP_STEPS.ADDRESS),
+  };
 }
 
 async function saveAddress({ merchantId, streetNumber, streetName, area }) {
   const user = await User.findByPk(merchantId);
   if (!user) throw new Error('Merchant not found');
-  const regions = user.regions || {};
-  regions.address = { streetNumber, streetName, area };
-  await user.update({ regions });
+  const regions = getRegionsObject(user);
+  const address = {
+    ...(regions.address || {}),
+    streetNumber,
+    streetName,
+    area,
+  };
+  await user.update({
+    regions: {
+      ...regions,
+      address,
+      signup_step: SIGNUP_STEPS.PICTURES,
+    },
+  });
 }
 
 async function savePictures({ merchantId, logo, restaurantImages }) {
@@ -63,7 +185,45 @@ async function savePictures({ merchantId, logo, restaurantImages }) {
     }
   }
 
-  await user.update({ restaurant_logo: restaurantLogo, restaurant_images: restaurantImagesUrls });
+  const regions = getRegionsObject(user);
+  await user.update({
+    restaurant_logo: restaurantLogo,
+    restaurant_images: restaurantImagesUrls,
+    regions: {
+      ...regions,
+      signup_step: SIGNUP_STEPS.COMPLETE,
+    },
+  });
+}
+
+async function completeSignup({ merchantId }) {
+  const user = await User.findByPk(merchantId);
+  if (!user) throw new Error('Merchant not found');
+  const regions = getRegionsObject(user);
+  await user.update({
+    regions: {
+      ...regions,
+      signup_step: SIGNUP_STEPS.COMPLETE,
+    },
+  });
+  await user.reload();
+  return buildSignupProgress(user);
+}
+
+async function getSignupProgress({ email, merchantId }) {
+  let user = null;
+  if (merchantId) {
+    user = await User.findByPk(merchantId);
+  } else if (email) {
+    user = await User.findOne({
+      where: {
+        email: String(email).trim().toLowerCase(),
+        type: 'Merchant',
+      },
+    });
+  }
+  if (!user) return null;
+  return buildSignupProgress(user);
 }
 
 async function saveCard({ merchantId, cardNumber, expiry, cvv }) {
@@ -75,10 +235,24 @@ async function saveCard({ merchantId, cardNumber, expiry, cvv }) {
 }
 
 async function login({ email, password }) {
-  const user = await User.findOne({ where: { email } });
+  const user = await User.findOne({
+    where: {
+      email: String(email || '').trim().toLowerCase(),
+      type: 'Merchant',
+    },
+  });
   if (!user) throw new Error('Invalid credentials');
   const match = await bcrypt.compare(password, user.password);
   if (!match) throw new Error('Invalid credentials');
+
+  const progress = buildSignupProgress(user);
+  if (!progress.completed) {
+    const error = new Error('Please finish creating your account');
+    error.code = 'SIGNUP_INCOMPLETE';
+    error.signupProgress = progress;
+    throw error;
+  }
+
   return normalizeUserResponse(user);
 }
 
@@ -492,6 +666,8 @@ module.exports = {
   saveAddress,
   savePictures,
   saveCard,
+  completeSignup,
+  getSignupProgress,
   login,
   findMerchantByEmail,
   merchantStatistics,

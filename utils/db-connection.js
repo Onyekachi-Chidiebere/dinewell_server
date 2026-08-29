@@ -26,14 +26,14 @@ const sequelize = new Sequelize(`postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOS
         acquire: 30000,
         idle: 10000,
     },
-    // dialectOptions: {
-    //     ssl: {
-    //         require: true,
-    //         rejectUnauthorized: false,
-    //         ca: caCert
-    //      },
-    //     keepAlive: true,
-    // },
+    dialectOptions: {
+        ssl: {
+            require: true,
+            rejectUnauthorized: false,
+            ca: caCert
+         },
+        keepAlive: true,
+    },
 });
 
 
