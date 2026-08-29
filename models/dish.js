@@ -37,6 +37,12 @@ const Dish = sequelize.define('Dish', {
     allowNull: true,
     defaultValue: 0,
   },
+  status: {
+    // active | paused
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    defaultValue: 'active',
+  },
   date_created: {
     type: DataTypes.DATE,
     allowNull: false,

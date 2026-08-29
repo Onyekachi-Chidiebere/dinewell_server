@@ -114,6 +114,24 @@ exports.updateDishBase64 = async (req, res) => {
   }
 };
 
+exports.setDishStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { restaurant_id, status } = req.body || {};
+    if (!restaurant_id) {
+      return res.status(400).json({ error: 'restaurant_id is required.' });
+    }
+    if (!status) {
+      return res.status(400).json({ error: 'status is required (active or paused).' });
+    }
+    const updatedDish = await dishService.setDishStatus(id, restaurant_id, status);
+    res.json(updatedDish);
+  } catch (err) {
+    console.error('setDishStatus error:', err);
+    res.status(400).json({ error: err.message });
+  }
+};
+
 exports.deleteDish = async (req, res) => {
   try {
     const { id } = req.params;

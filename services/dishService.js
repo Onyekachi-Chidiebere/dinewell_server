@@ -4,7 +4,6 @@ const { uploadBufferToCloudinary } = require('../utils/cloudinary');
 const { Op } = require('sequelize');
 
 async function createDish(dishData, restaurantId, dishImageFile) {
-  // Verify if the restaurant exists and is a merchant
   const restaurant = await User.findByPk(restaurantId);
   if (!restaurant || restaurant.type !== 'Merchant') {
     throw new Error('Restaurant not found or not a valid merchant.');
@@ -29,6 +28,7 @@ async function createDish(dishData, restaurantId, dishImageFile) {
     points_per_dollar: dishData.points_per_dollar || 0,
     dish_image_url: dish_image_url,
     base_points_per_dish: dishData.base_points_per_dish || 0,
+    status: 'active',
   });
 
   return newDish;
@@ -45,19 +45,18 @@ async function getDishById(dishId, restaurantId) {
 }
 
 async function getDishesByRestaurant(restaurantId, searchQuery) {
-  // Active dishes = total dishes for this restaurant (independent of search)
   const allDishes = await Dish.findAll({
     where: { restaurant_id: restaurantId },
   });
-  const activeDishes = allDishes.length;
+  const activeDishes = allDishes.filter(
+    (d) => (d.status || 'active') === 'active'
+  ).length;
 
-  // Apply optional search filter for the list we return
   const whereClause = {
     restaurant_id: restaurantId,
   };
 
   if (searchQuery) {
-    // Filter by dish_name containing the search query (case-insensitive)
     whereClause.dish_name = {
       [Op.iLike]: `%${searchQuery}%`,
     };
@@ -83,7 +82,7 @@ async function updateDish(dishId, restaurantId, dishData, dishImageFile) {
     throw new Error('Dish not found or does not belong to this restaurant.');
   }
 
-  let dish_image_url = dish.dish_image_url; // Keep existing image if no new one is uploaded
+  let dish_image_url = dish.dish_image_url;
   if (dishImageFile) {
     const folder = `dinewell/dishes/${restaurantId}`;
     const filename = `dish-${Date.now()}`;
@@ -95,15 +94,33 @@ async function updateDish(dishId, restaurantId, dishData, dishImageFile) {
     );
   }
 
-  // Update fields
-  dish.dish_name = dishData.dish_name || dish.dish_name;
-  dish.price = dishData.price || dish.price;
-  dish.points_per_dollar = dishData.points_per_dollar !== undefined ? dishData.points_per_dollar : dish.points_per_dollar;
+  if (dishData.dish_name !== undefined && dishData.dish_name !== '') {
+    dish.dish_name = dishData.dish_name;
+  }
+  if (dishData.price !== undefined && dishData.price !== '') {
+    dish.price = dishData.price;
+  }
+  if (dishData.points_per_dollar !== undefined) {
+    dish.points_per_dollar = dishData.points_per_dollar;
+  }
+  if (dishData.base_points_per_dish !== undefined) {
+    dish.base_points_per_dish = dishData.base_points_per_dish;
+  }
+  if (dishData.status !== undefined) {
+    const next = String(dishData.status).toLowerCase();
+    if (next !== 'active' && next !== 'paused') {
+      throw new Error('status must be active or paused');
+    }
+    dish.status = next;
+  }
   dish.dish_image_url = dish_image_url;
-  dish.base_points_per_dish = dishData.base_points_per_dish !== undefined ? dishData.base_points_per_dish : dish.base_points_per_dish;
 
   await dish.save();
   return dish;
+}
+
+async function setDishStatus(dishId, restaurantId, status) {
+  return updateDish(dishId, restaurantId, { status }, null);
 }
 
 async function deleteDish(dishId, restaurantId) {
@@ -124,5 +141,6 @@ module.exports = {
   getDishById,
   getDishesByRestaurant,
   updateDish,
+  setDishStatus,
   deleteDish,
 };
