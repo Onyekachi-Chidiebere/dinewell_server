@@ -48,9 +48,11 @@ router.put('/merchant/:merchantId/password', merchantController.changePassword);
 
 // Dish management routes
 router.post('/dishes', upload.single('dishImage'), dishController.createDish);
+router.post('/dishes/base64', dishController.createDishBase64);
 router.get('/dishes/:id', dishController.getDish);
 router.get(['/restaurants/:restaurantId/dishes','/restaurants/:restaurantId/dishes/:searchQuery'], dishController.getRestaurantDishes);
 router.put('/dishes/:id', upload.single('dishImage'), dishController.updateDish);
+router.put('/dishes/:id/base64', dishController.updateDishBase64);
 router.delete('/dishes/:id', dishController.deleteDish);
 
 // Card management routes (Stripe)
