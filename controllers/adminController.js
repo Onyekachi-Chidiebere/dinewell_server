@@ -1,4 +1,5 @@
 const adminService = require('../services/adminService');
+const merchantService = require('../services/merchantService');
 
 /**
  * Admin login endpoint
@@ -114,5 +115,52 @@ exports.updateAdminPassword = async (req, res) => {
     res.status(500).json({
       error: 'Internal server error'
     });
+  }
+};
+
+exports.getRestaurants = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status = 'all' } = req.query;
+    const result = await merchantService.getRestaurants(
+      parseInt(page),
+      parseInt(limit),
+      String(status).toLowerCase()
+    );
+    res.json(result);
+  } catch (error) {
+    console.error('Admin get restaurants error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.approveRestaurant = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const result = await merchantService.approveRestaurant(restaurantId);
+    res.json({
+      message: result.alreadyApproved
+        ? 'Restaurant is already active'
+        : 'Restaurant approved successfully',
+      restaurant: result,
+    });
+  } catch (error) {
+    console.error('Admin approve restaurant error:', error);
+    res.status(400).json({ error: error.message });
+  }
+};
+
+exports.disableRestaurant = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const result = await merchantService.disableRestaurant(restaurantId);
+    res.json({
+      message: result.alreadyDisabled
+        ? 'Restaurant is already disabled'
+        : 'Restaurant disabled successfully',
+      restaurant: result,
+    });
+  } catch (error) {
+    console.error('Admin disable restaurant error:', error);
+    res.status(400).json({ error: error.message });
   }
 };

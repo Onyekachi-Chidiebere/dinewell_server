@@ -12,6 +12,32 @@ function normalizeUserResponse(userInstance) {
   return user;
 }
 
+const APPROVAL = {
+  PENDING: 0,
+  APPROVED: 1,
+  DISABLED: -1,
+};
+
+function mapApprovalStatus(approvalStatus) {
+  if (approvalStatus === APPROVAL.APPROVED) return 'active';
+  if (approvalStatus === APPROVAL.DISABLED) return 'disabled';
+  return 'pending';
+}
+
+function pendingApprovalWhere() {
+  return {
+    [Op.or]: [{ approval_status: APPROVAL.PENDING }, { approval_status: null }],
+  };
+}
+
+function merchantStatusWhere(statusFilter) {
+  if (!statusFilter || statusFilter === 'all') return {};
+  if (statusFilter === 'active') return { approval_status: APPROVAL.APPROVED };
+  if (statusFilter === 'pending') return pendingApprovalWhere();
+  if (statusFilter === 'disabled') return { approval_status: APPROVAL.DISABLED };
+  return {};
+}
+
 const SIGNUP_STEPS = {
   DETAILS: 'details',
   ADDRESS: 'address',
@@ -124,6 +150,7 @@ async function saveDetails({ name, phone, email, location, password }) {
     email: normalizedEmail,
     password: hashedPassword,
     type: 'Merchant',
+    approval_status: APPROVAL.PENDING,
     date_created: new Date(),
     regions: {
       address: { location },
@@ -189,6 +216,7 @@ async function savePictures({ merchantId, logo, restaurantImages }) {
   await user.update({
     restaurant_logo: restaurantLogo,
     restaurant_images: restaurantImagesUrls,
+    approval_status: APPROVAL.PENDING,
     regions: {
       ...regions,
       signup_step: SIGNUP_STEPS.COMPLETE,
@@ -201,13 +229,20 @@ async function completeSignup({ merchantId }) {
   if (!user) throw new Error('Merchant not found');
   const regions = getRegionsObject(user);
   await user.update({
+    approval_status: APPROVAL.PENDING,
     regions: {
       ...regions,
       signup_step: SIGNUP_STEPS.COMPLETE,
     },
   });
   await user.reload();
-  return buildSignupProgress(user);
+  return {
+    ...buildSignupProgress(user),
+    approval_status: user.approval_status,
+    approvalStatus: mapApprovalStatus(user.approval_status),
+    pendingReviewMessage:
+      'Your restaurant is under review. We will notify you once an admin verifies your account.',
+  };
 }
 
 async function getSignupProgress({ email, merchantId }) {
@@ -253,7 +288,98 @@ async function login({ email, password }) {
     throw error;
   }
 
-  return normalizeUserResponse(user);
+  if (user.approval_status === APPROVAL.DISABLED) {
+    throw new Error('Your restaurant account has been suspended. Please contact support.');
+  }
+
+  const normalized = normalizeUserResponse(user);
+  return {
+    ...normalized,
+    approval_status: user.approval_status ?? APPROVAL.PENDING,
+    approvalStatus: mapApprovalStatus(user.approval_status),
+  };
+}
+
+async function getApprovalStatus(merchantId) {
+  const user = await User.findOne({
+    where: { id: merchantId, type: 'Merchant' },
+    attributes: ['id', 'approval_status', 'restaurant_name', 'date_approved'],
+  });
+  if (!user) throw new Error('Merchant not found');
+  return {
+    id: user.id,
+    restaurant_name: user.restaurant_name,
+    approval_status: user.approval_status ?? APPROVAL.PENDING,
+    approvalStatus: mapApprovalStatus(user.approval_status),
+    date_approved: user.date_approved,
+  };
+}
+
+async function approveRestaurant(restaurantId) {
+  const user = await User.findOne({
+    where: { id: restaurantId, type: 'Merchant' },
+  });
+  if (!user) throw new Error('Restaurant not found');
+
+  const progress = buildSignupProgress(user);
+  if (!progress.completed) {
+    throw new Error('This restaurant has not finished signup yet');
+  }
+
+  if (user.approval_status === APPROVAL.APPROVED) {
+    return {
+      id: user.id,
+      restaurant_name: user.restaurant_name,
+      approval_status: APPROVAL.APPROVED,
+      approvalStatus: 'active',
+      date_approved: user.date_approved,
+      alreadyApproved: true,
+    };
+  }
+
+  await user.update({
+    approval_status: APPROVAL.APPROVED,
+    date_approved: new Date(),
+  });
+
+  return {
+    id: user.id,
+    restaurant_name: user.restaurant_name,
+    approval_status: APPROVAL.APPROVED,
+    approvalStatus: 'active',
+    date_approved: user.date_approved,
+    alreadyApproved: false,
+  };
+}
+
+async function disableRestaurant(restaurantId) {
+  const user = await User.findOne({
+    where: { id: restaurantId, type: 'Merchant' },
+  });
+  if (!user) throw new Error('Restaurant not found');
+
+  if (user.approval_status === APPROVAL.DISABLED) {
+    return {
+      id: user.id,
+      restaurant_name: user.restaurant_name,
+      approval_status: APPROVAL.DISABLED,
+      approvalStatus: 'disabled',
+      alreadyDisabled: true,
+    };
+  }
+
+  await user.update({
+    approval_status: APPROVAL.DISABLED,
+    date_approved: null,
+  });
+
+  return {
+    id: user.id,
+    restaurant_name: user.restaurant_name,
+    approval_status: APPROVAL.DISABLED,
+    approvalStatus: 'disabled',
+    alreadyDisabled: false,
+  };
 }
 
 async function findMerchantByEmail(email) {
@@ -352,38 +478,42 @@ async function merchantStatistics(merchantId) {
   };
 }
 
-async function getRestaurants(page = 1, limit = 10) {
+async function getRestaurants(page = 1, limit = 10, statusFilter = 'all') {
   const offset = (page - 1) * limit;
-  
-  // Get statistics for all restaurants
-  const allCount = await User.count({
-    where: { type: 'Merchant' }
-  });
-  
+  const merchantBaseWhere = { type: 'Merchant' };
+
+  const allCount = await User.count({ where: merchantBaseWhere });
+
   const activeCount = await User.count({
-    where: { 
-      type: 'Merchant',
-      approval_status: 1 
-    }
-  });
-  
-  const pendingCount = await User.count({
-    where: { 
-      type: 'Merchant',
-      approval_status: 0 
-    }
-  });
-  
-  const disabledCount = await User.count({
-    where: { 
-      type: 'Merchant',
-      approval_status: -1 
-    }
+    where: {
+      ...merchantBaseWhere,
+      approval_status: APPROVAL.APPROVED,
+    },
   });
 
-  // Get paginated restaurants
+  const pendingCount = await User.count({
+    where: {
+      ...merchantBaseWhere,
+      ...pendingApprovalWhere(),
+    },
+  });
+
+  const disabledCount = await User.count({
+    where: {
+      ...merchantBaseWhere,
+      approval_status: APPROVAL.DISABLED,
+    },
+  });
+
+  const listWhere = {
+    ...merchantBaseWhere,
+    ...merchantStatusWhere(statusFilter),
+  };
+
+  const filteredCount = await User.count({ where: listWhere });
+
   const restaurants = await User.findAll({
-    where: { type: 'Merchant' },
+    where: listWhere,
     attributes: [
       'id',
       'restaurant_name',
@@ -391,24 +521,24 @@ async function getRestaurants(page = 1, limit = 10) {
       'phone',
       'approval_status',
       'date_created',
-      'regions'
+      'date_approved',
+      'regions',
     ],
     order: [['date_created', 'DESC']],
     limit: parseInt(limit),
     offset: parseInt(offset),
-    raw: true
+    raw: true,
   });
 
-  // Format restaurant data
-  const formattedRestaurants = restaurants.map(restaurant => ({
+  const formattedRestaurants = restaurants.map((restaurant) => ({
     id: restaurant.id,
     name: restaurant.restaurant_name,
     location: restaurant.regions?.address?.location || 'Not specified',
-    status: restaurant.approval_status === 1 ? 'active' : 
-            restaurant.approval_status === 0 ? 'pending' : 'disabled',
+    status: mapApprovalStatus(restaurant.approval_status),
     email: restaurant.email,
     phone: restaurant.phone,
-    dateCreated: restaurant.date_created
+    dateCreated: restaurant.date_created,
+    dateApproved: restaurant.date_approved,
   }));
 
   return {
@@ -421,10 +551,10 @@ async function getRestaurants(page = 1, limit = 10) {
     restaurants: formattedRestaurants,
     pagination: {
       currentPage: parseInt(page),
-      totalPages: Math.ceil(allCount / limit),
-      totalItems: allCount,
-      itemsPerPage: parseInt(limit)
-    }
+      totalPages: Math.ceil(filteredCount / limit) || 1,
+      totalItems: filteredCount,
+      itemsPerPage: parseInt(limit),
+    },
   };
 }
 
@@ -676,4 +806,8 @@ module.exports = {
   resetMerchantPassword,
   getRestaurants,
   getRestaurantDetails,
+  getApprovalStatus,
+  approveRestaurant,
+  disableRestaurant,
+  mapApprovalStatus,
 };

@@ -41,6 +41,7 @@ router.post('/merchant/forgot-password/send-otp', merchantController.sendPasswor
 router.post('/merchant/forgot-password/verify-otp', merchantController.verifyPasswordResetOTP);
 router.post('/merchant/forgot-password/reset', merchantController.resetPassword);
 router.get('/merchant/:merchantId/statistics', merchantController.getStatistics);
+router.get('/merchant/:merchantId/approval-status', merchantController.getApprovalStatus);
 router.get('/merchant/restaurants', merchantController.getRestaurants);
 router.get('/merchant/restaurants/:restaurantId', merchantController.getRestaurantDetails);
 router.put('/merchant/profile/:userId', upload.single('profileImage'), merchantController.updateMerchantProfile);
@@ -103,6 +104,9 @@ router.post('/admin/login', adminController.adminLogin);
 router.post('/admin/create', adminController.createAdmin);
 router.get('/admin/profile', adminAuth, adminController.getAdminProfile);
 router.put('/admin/password', adminAuth, adminController.updateAdminPassword);
+router.get('/admin/restaurants', adminAuth, adminController.getRestaurants);
+router.patch('/admin/restaurants/:restaurantId/approve', adminAuth, adminController.approveRestaurant);
+router.patch('/admin/restaurants/:restaurantId/disable', adminAuth, adminController.disableRestaurant);
 
 // Admin statistics routes
 router.get('/admin/statistics/restaurants', adminAuth, adminStatisticsController.getRestaurantStatistics);

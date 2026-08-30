@@ -146,7 +146,7 @@ exports.signupCard = (req, res) => {
 exports.login = async (req, res) => {
   try {
     const merchant = await merchantService.login(req.body);
-    const response = {
+    res.json({
       id: merchant.id,
       restaurant_name: merchant.restaurant_name,
       restaurant_logo: merchant.restaurant_logo || null,
@@ -156,8 +156,9 @@ exports.login = async (req, res) => {
       date_of_birth: merchant.date_of_birth || null,
       gender: merchant.gender || null,
       profile_image: merchant.profile_image || null,
-    };
-    res.json(response);
+      approval_status: merchant.approval_status,
+      approvalStatus: merchant.approvalStatus,
+    });
   } catch (err) {
     if (err.code === 'SIGNUP_INCOMPLETE' && err.signupProgress) {
       return res.status(403).json({
@@ -183,8 +184,23 @@ exports.getStatistics = async (req, res) => {
 
 exports.getRestaurants = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const result = await merchantService.getRestaurants(parseInt(page), parseInt(limit));
+    const { page = 1, limit = 10, status = 'all' } = req.query;
+    const result = await merchantService.getRestaurants(
+      parseInt(page),
+      parseInt(limit),
+      String(status).toLowerCase()
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+exports.getApprovalStatus = async (req, res) => {
+  try {
+    const { merchantId } = req.params;
+    if (!merchantId) return res.status(400).json({ error: 'merchantId is required' });
+    const result = await merchantService.getApprovalStatus(merchantId);
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
