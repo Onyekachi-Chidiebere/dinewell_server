@@ -249,26 +249,34 @@ async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
             filteredWhere.type = 'redeem';
         }
 
-        // Get total count of all points
-        const totalPoints = await Points.count({
-            where: baseWhere
+        // Point volume totals (not transaction counts)
+        const [totalPointsRow] = await Points.findAll({
+            attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
+            where: baseWhere,
+            raw: true,
         });
 
-        // Get total count of issued points
-        const totalIssued = await Points.count({
+        const [totalIssuedRow] = await Points.findAll({
+            attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
             where: {
                 ...baseWhere,
-                type: 'issue'
-            }
+                type: 'issue',
+            },
+            raw: true,
         });
 
-        // Get total count of redeemed points
-        const totalRedeemed = await Points.count({
+        const [totalRedeemedRow] = await Points.findAll({
+            attributes: [[fn('COALESCE', fn('SUM', col('total_points')), 0), 'sum']],
             where: {
                 ...baseWhere,
-                type: 'redeem'
-            }
+                type: 'redeem',
+            },
+            raw: true,
         });
+
+        const totalPoints = Number(totalPointsRow?.sum || 0);
+        const totalIssued = Number(totalIssuedRow?.sum || 0);
+        const totalRedeemed = Number(totalRedeemedRow?.sum || 0);
 
         // Get filtered count based on filter type
         const filteredCount = await Points.count({
@@ -355,7 +363,7 @@ async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
             points: formattedPoints,
             pagination: {
                 currentPage: parseInt(page),
-                totalPages: Math.ceil(filteredCount / limit),
+                totalPages: Math.ceil(filteredCount / limit) || 1,
                 totalItems: filteredCount,
                 itemsPerPage: parseInt(limit)
             }

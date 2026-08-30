@@ -361,8 +361,12 @@ exports.resetPassword = async (req, res) => {
 };
 exports.getCustomers = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
-    const result = await clientService.getCustomers(parseInt(page), parseInt(limit));
+    const { page = 1, limit = 10, sort = 'recent' } = req.query;
+    const result = await clientService.getCustomers(
+      parseInt(page, 10),
+      parseInt(limit, 10),
+      String(sort)
+    );
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });

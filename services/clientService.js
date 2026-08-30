@@ -487,15 +487,81 @@ async function clientStatistics(clientId) {
     pointsBalance: Number(issuedAllRow?.sum || 0) - Number(redeemedAllRow?.sum || 0),
   };
 }
-async function getCustomers(page = 1, limit = 10) {
+async function getCustomers(page = 1, limit = 10, sort = 'recent') {
   const offset = (page - 1) * limit;
-  
-  // Get total customers count
+
   const totalCustomers = await User.count({
-    where: { type: 'Customer' }
+    where: { type: 'Customer' },
   });
 
-  // Get paginated customers with their statistics
+  if (sort === 'top') {
+    const customers = await User.findAll({
+      where: { type: 'Customer' },
+      attributes: [
+        'id',
+        'name',
+        'email',
+        'phone',
+        'date_created',
+        [
+          literal(
+            `COALESCE(SUM(CASE WHEN "customerPoints"."type" = 'issue' AND "customerPoints"."status" = 'completed' THEN "customerPoints"."total_points" ELSE 0 END), 0)`
+          ),
+          'total_points_earned',
+        ],
+        [
+          literal('COUNT(DISTINCT "customerPoints"."restaurant_id")'),
+          'total_restaurants_visited',
+        ],
+      ],
+      include: [
+        {
+          model: Points,
+          as: 'customerPoints',
+          attributes: [],
+          required: false,
+          where: { status: 'completed' },
+        },
+      ],
+      group: ['user.id'],
+      order: [
+        [
+          literal(
+            `COALESCE(SUM(CASE WHEN "customerPoints"."type" = 'issue' AND "customerPoints"."status" = 'completed' THEN "customerPoints"."total_points" ELSE 0 END), 0)`
+          ),
+          'DESC',
+        ],
+      ],
+      limit: parseInt(limit, 10),
+      offset: parseInt(offset, 10),
+      subQuery: false,
+      raw: true,
+    });
+
+    const customersWithStats = customers.map((customer) => ({
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone || 'Not provided',
+      total_points_earned: Number(customer.total_points_earned || 0),
+      total_restaurants_visited: Number(customer.total_restaurants_visited || 0),
+      date_created: customer.date_created,
+    }));
+
+    return {
+      statistics: {
+        total_customers: totalCustomers,
+      },
+      customers: customersWithStats,
+      pagination: {
+        currentPage: parseInt(page, 10),
+        totalPages: Math.ceil(Math.min(totalCustomers, 100) / limit) || 1,
+        totalItems: Math.min(totalCustomers, 100),
+        itemsPerPage: parseInt(limit, 10),
+      },
+    };
+  }
+
   const customers = await User.findAll({
     where: { type: 'Customer' },
     attributes: [
@@ -690,13 +756,16 @@ async function getCustomerDetails(customerId, page = 1, limit = 10) {
     throw new Error('Customer not found');
   }
 
-  // Get total restaurant visits (count of all completed transactions)
-  const totalRestaurantVisits = await Points.count({
+  // Unique restaurants visited by this customer
+  const uniqueRestaurants = await Points.findAll({
+    attributes: [[fn('COUNT', fn('DISTINCT', col('restaurant_id'))), 'count']],
     where: {
       customer_id: customerId,
-      status: 'completed'
-    }
+      status: 'completed',
+    },
+    raw: true,
   });
+  const totalRestaurantVisits = Number(uniqueRestaurants[0]?.count || 0);
 
   // Get total points earned (sum of all issued points)
   const [pointsEarnedRow] = await Points.findAll({

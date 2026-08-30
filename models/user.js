@@ -52,7 +52,7 @@ User.init(
             type: DataTypes.STRING(255)
         },
         approval_status: {
-            //2 -  NOT APPROVED; 1 - APPROVED; 0 - PENDING;
+            // 2 - NOT APPROVED; 1 - APPROVED; 0 - PENDING; -1 - DISABLED
             type: DataTypes.INTEGER,
             default:0
         },

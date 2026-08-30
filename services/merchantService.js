@@ -585,13 +585,17 @@ async function getRestaurantDetails(restaurantId) {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-  // Get total visits (count of completed points transactions)
-  const totalVisits = await Points.count({
+  // Unique customers with completed visits
+  const uniqueCustomers = await Points.findAll({
+    attributes: [[fn('COUNT', fn('DISTINCT', col('customer_id'))), 'count']],
     where: {
       restaurant_id: restaurantId,
-      status: 'completed'
-    }
+      status: 'completed',
+      customer_id: { [Op.ne]: null },
+    },
+    raw: true,
   });
+  const totalVisits = Number(uniqueCustomers[0]?.count || 0);
 
   // Get total points issued
   const [totalPointsRow] = await Points.findAll({

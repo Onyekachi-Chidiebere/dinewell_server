@@ -80,8 +80,8 @@ router.get('/client/:clientId/restaurants-visited', clientController.getRestaura
 router.get('/client/:clientId/transaction-history', clientController.getTransactionHistory);
 router.get('/client/:clientId/visited-restaurants', clientController.getVisitedRestaurants);
 router.get('/client/restaurants', clientController.getAllRestaurants);
-router.get('/client/customers', clientController.getCustomers);
-router.get('/client/customers/:customerId', clientController.getCustomerDetails);
+router.get('/client/customers', adminAuth, clientController.getCustomers);
+router.get('/client/customers/:customerId', adminAuth, clientController.getCustomerDetails);
 router.post('/client/:senderId/share-points', clientController.sharePoints);
 // Points management routes
 router.post('/points', pointsController.createPoints);
@@ -91,7 +91,7 @@ router.get('/restaurants/:restaurantId/points', pointsController.getPointsByRest
 router.get('/points/qr/:qrCode', pointsController.getPointsByQrCode);
 router.post('/points/:id/issue', pointsController.issuePoints);
 router.post('/points/scan/:qrCode', pointsController.scanQrCode);
-router.get('/points/admin/list', pointsController.getPointsForAdmin);
+router.get('/points/admin/list', adminAuth, pointsController.getPointsForAdmin);
 router.get('/rate', pointsController.getPointsRate);
 router.get('/restaurants/:restaurantId/points/history', pointsController.getPointsHistoryForMerchant);
 
