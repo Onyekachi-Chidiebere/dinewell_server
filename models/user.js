@@ -95,6 +95,18 @@ User.init(
             type: DataTypes.INTEGER,
             default:0
         },
+        // Billing enforcement: blocked when unpaid issued debt >= global debt limit
+        points_blocked: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
+        // Set when a card charge fails; cleared on successful charge
+        payment_failed: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
         restaurant_logo: {
             type: DataTypes.STRING(255)
         },

@@ -13,6 +13,7 @@ const pointsController = require('./controllers/pointsController');
 const paymentController = require('./controllers/paymentController');
 const adminController = require('./controllers/adminController');
 const adminStatisticsController = require('./controllers/adminStatisticsController');
+const platformSettingsController = require('./controllers/platformSettingsController');
 const adminAuth = require('./utils/adminAuth');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -97,7 +98,7 @@ router.get('/restaurants/:restaurantId/points/history', pointsController.getPoin
 
 // Payment management routes
 router.get('/restaurants/:restaurantId/payments/history', paymentController.getPaymentHistory);
-router.post('/payments/process-daily', paymentController.processDailyPayments); // Admin/testing endpoint
+router.post('/payments/process-daily', adminAuth, platformSettingsController.processDailyPayments); // Admin endpoint
 
 // Admin management routes
 router.post('/admin/login', adminController.adminLogin);
@@ -107,6 +108,9 @@ router.put('/admin/password', adminAuth, adminController.updateAdminPassword);
 router.get('/admin/restaurants', adminAuth, adminController.getRestaurants);
 router.patch('/admin/restaurants/:restaurantId/approve', adminAuth, adminController.approveRestaurant);
 router.patch('/admin/restaurants/:restaurantId/disable', adminAuth, adminController.disableRestaurant);
+router.get('/admin/settings/platform', adminAuth, platformSettingsController.getPlatformSettings);
+router.put('/admin/settings/platform', adminAuth, platformSettingsController.updatePlatformSettings);
+router.get('/admin/payments', adminAuth, platformSettingsController.getPayments);
 
 // Admin statistics routes
 router.get('/admin/statistics/restaurants', adminAuth, adminStatisticsController.getRestaurantStatistics);

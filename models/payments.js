@@ -71,6 +71,10 @@ Payment.init(
         card_brand: {
             type: DataTypes.STRING(50),
             allowNull: true
+        },
+        error_message: {
+            type: DataTypes.TEXT,
+            allowNull: true
         }
     },
     {

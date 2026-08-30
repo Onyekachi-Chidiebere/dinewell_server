@@ -53,8 +53,11 @@ exports.createPoints = async (req, res) => {
         res.status(201).json(result);
     } catch (err) {
         console.error('Create points error:', err);
-        res.status(400).json({ 
-            error: err.message || 'Failed to create points transaction' 
+        const status = err.code === 'POINTS_BLOCKED' ? 403 : 400;
+        res.status(status).json({ 
+            error: err.message || 'Failed to create points transaction',
+            code: err.code || undefined,
+            billing: err.billing || undefined,
         });
     }
 };
@@ -259,7 +262,7 @@ exports.getPointsForAdmin = async (req, res) => {
  */
 exports.getPointsRate = async (req, res) => {
     try {
-        const pointsRate = pointsService.getPointsRate();
+        const pointsRate = await pointsService.getPointsRate();
         res.json(pointsRate);
     } catch (err) {
         console.error('Get points rate error:', err);

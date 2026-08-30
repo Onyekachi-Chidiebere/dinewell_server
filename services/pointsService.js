@@ -1,16 +1,12 @@
 const Points = require('../models/points');
 const { v4: uuidv4 } = require('uuid');
-const POINTS_RATE = {
-    issue: 10, // 10 points per doller
-    redeem: 500 // 500 points per dollar
-}
+const platformSettingsService = require('./platformSettingsService');
 
 /**
  * Calculate points based on price and points per dollar rate
  */
-function calculatePoints(price, type) {
-    let pointsPerDollar = POINTS_RATE[type]
-    return Math.round(price * pointsPerDollar);
+function calculatePoints(price, pointsPerDollar) {
+    return Math.round(Number(price) * Number(pointsPerDollar));
 }
 
 /**
@@ -35,9 +31,15 @@ async function savePoints({
             throw new Error('At least one dish is required');
         }
 
+        // Block both issue and redeem when restaurant is over debt limit
+        await platformSettingsService.assertCanGeneratePoints(restaurantId);
+
+        const rates = await platformSettingsService.getPointsRate();
+        const pointsPerDollar = type === 'redeem' ? rates.redeem : rates.issue;
+
         // Calculate total points
         const totalPoints = dishes.reduce((sum, dish) => {
-            const dishPoints = calculatePoints(dish.price, type);
+            const dishPoints = calculatePoints(dish.price, pointsPerDollar);
             return sum + (dishPoints * dish.quantity);
         }, 0);
 
@@ -53,6 +55,7 @@ async function savePoints({
             dishes: dishes,
             total_price: totalPrice,
             total_points: totalPoints,
+            points_per_dollar: pointsPerDollar,
             qr_code: qrCode,
             notes: notes
         });
@@ -63,7 +66,10 @@ async function savePoints({
         };
     } catch (error) {
         console.error('Error saving points:', error);
-        throw new Error(`${error.message}`);
+        const err = new Error(`${error.message}`);
+        if (error.code) err.code = error.code;
+        if (error.billing) err.billing = error.billing;
+        throw err;
     }
 }
 
@@ -222,7 +228,21 @@ async function issuePoints(pointsId, customerId = null) {
             date_used: new Date()
         };
 
-        return await updatePoints(pointsId, updateData);
+        const result = await updatePoints(pointsId, updateData);
+
+        // Re-evaluate debt / block after an issue completes
+        try {
+            const pointsRecord = result.points;
+            if (pointsRecord && pointsRecord.type === 'issue' && pointsRecord.restaurant_id) {
+                await platformSettingsService.refreshRestaurantBillingStatus(
+                    pointsRecord.restaurant_id
+                );
+            }
+        } catch (billingErr) {
+            console.error('Billing status refresh after issue failed:', billingErr);
+        }
+
+        return result;
     } catch (error) {
         console.error('Error issuing points:', error);
         throw new Error(`${error.message}`);
@@ -377,8 +397,8 @@ async function getPointsForAdmin(page = 1, limit = 10, filterType = 'all') {
 /**
  * Get points rate configuration
  */
-function getPointsRate() {
-    return POINTS_RATE;
+async function getPointsRate() {
+    return platformSettingsService.getPointsRate();
 }
 
 /**

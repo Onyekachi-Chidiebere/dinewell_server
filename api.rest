@@ -373,3 +373,31 @@ GET {{baseUrl}}/points/admin/list?page=1&limit=10&type=issued
 
 ### 67. Get Points List - Redeemed Points Only
 GET {{baseUrl}}/points/admin/list?page=1&limit=10&type=redeemed
+
+### 68. Get platform settings (admin)
+GET {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+
+### 69. Update platform settings (admin)
+PUT {{baseUrl}}/admin/settings/platform
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "customerEarnRate": 10,
+  "customerRedeemRate": 500,
+  "merchantBillingRate": 0.1,
+  "debtLimitUsd": 100
+}
+
+### 70. Admin payments list
+GET {{baseUrl}}/admin/payments?page=1&limit=10&status=all
+Authorization: Bearer {{adminToken}}
+
+### 71. Admin payments - failed only
+GET {{baseUrl}}/admin/payments?page=1&limit=10&status=failed
+Authorization: Bearer {{adminToken}}
+
+### 72. Process daily payments (admin)
+POST {{baseUrl}}/payments/process-daily
+Authorization: Bearer {{adminToken}}

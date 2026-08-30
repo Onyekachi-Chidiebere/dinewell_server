@@ -35,6 +35,16 @@ function merchantStatusWhere(statusFilter) {
   if (statusFilter === 'active') return { approval_status: APPROVAL.APPROVED };
   if (statusFilter === 'pending') return pendingApprovalWhere();
   if (statusFilter === 'disabled') return { approval_status: APPROVAL.DISABLED };
+  if (statusFilter === 'over_limit') return { points_blocked: true };
+  if (statusFilter === 'payment_failed') return { payment_failed: true };
+  if (statusFilter === 'no_card') {
+    return {
+      [Op.or]: [
+        { default_payment_card_id: null },
+        { default_payment_card_id: '' },
+      ],
+    };
+  }
   return {};
 }
 
@@ -505,6 +515,27 @@ async function getRestaurants(page = 1, limit = 10, statusFilter = 'all') {
     },
   });
 
+  const overLimitCount = await User.count({
+    where: {
+      ...merchantBaseWhere,
+      points_blocked: true,
+    },
+  });
+
+  const paymentFailedCount = await User.count({
+    where: {
+      ...merchantBaseWhere,
+      payment_failed: true,
+    },
+  });
+
+  const noCardCount = await User.count({
+    where: {
+      ...merchantBaseWhere,
+      ...merchantStatusWhere('no_card'),
+    },
+  });
+
   const listWhere = {
     ...merchantBaseWhere,
     ...merchantStatusWhere(statusFilter),
@@ -523,6 +554,9 @@ async function getRestaurants(page = 1, limit = 10, statusFilter = 'all') {
       'date_created',
       'date_approved',
       'regions',
+      'points_blocked',
+      'payment_failed',
+      'default_payment_card_id',
     ],
     order: [['date_created', 'DESC']],
     limit: parseInt(limit),
@@ -539,6 +573,14 @@ async function getRestaurants(page = 1, limit = 10, statusFilter = 'all') {
     phone: restaurant.phone,
     dateCreated: restaurant.date_created,
     dateApproved: restaurant.date_approved,
+    pointsBlocked: !!restaurant.points_blocked,
+    paymentFailed: !!restaurant.payment_failed,
+    hasCard: !!restaurant.default_payment_card_id,
+    flags: [
+      restaurant.points_blocked ? 'over_limit' : null,
+      !restaurant.default_payment_card_id ? 'no_card' : null,
+      restaurant.payment_failed ? 'payment_failed' : null,
+    ].filter(Boolean),
   }));
 
   return {
@@ -546,7 +588,10 @@ async function getRestaurants(page = 1, limit = 10, statusFilter = 'all') {
       all: allCount,
       active: activeCount,
       pending: pendingCount,
-      disabled: disabledCount
+      disabled: disabledCount,
+      over_limit: overLimitCount,
+      no_card: noCardCount,
+      payment_failed: paymentFailedCount,
     },
     restaurants: formattedRestaurants,
     pagination: {

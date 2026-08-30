@@ -10,8 +10,10 @@ const Dish = require('./models/dish');
 const Points = require('./models/points'); // ✅ keep consistent plural name
 const Payment = require('./models/payments');
 const Socket = require('./models/socket');
+const PlatformSettings = require('./models/platformSettings');
 const cron = require('node-cron');
 const paymentService = require('./services/paymentService');
+const platformSettingsService = require('./services/platformSettingsService');
 
 const port = process.env.PORT;
 
@@ -62,7 +64,7 @@ app.use('/', router);
 dbConnection();
 
 // ✅ Initialize associations manually
-const models = { User, Points, Dish, Payment, Socket };
+const models = { User, Points, Dish, Payment, Socket, PlatformSettings };
 
 Object.values(models).forEach((model) => {
   if (model.associate) {
@@ -76,11 +78,14 @@ Promise.all([
   User.sync({ alter: true }),
   Dish.sync({ alter: true }),
   Payment.sync({ alter: true }),
-  Socket.sync({ alter: true })
+  Socket.sync({ alter: true }),
+  PlatformSettings.sync({ alter: true }),
 ]).then(() => {
   // Sync Points after Payment is created
   return Points.sync({ alter: true });
-}).then(() => {
+}).then(async () => {
+  await platformSettingsService.ensureSettings();
+
   httpServer.listen(port, () => {
     console.log(`Server started at http://localhost:${port}`);
   });
