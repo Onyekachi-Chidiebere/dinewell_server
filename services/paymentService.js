@@ -148,6 +148,24 @@ async function processDailyPayments() {
                     await platformSettingsService.refreshRestaurantBillingStatus(
                         merchant.id
                     );
+
+                    try {
+                        const notificationService = require('./notificationService');
+                        await notificationService.createNotification({
+                            userId: merchant.id,
+                            title: 'Payment failed',
+                            body: `We could not charge your card for $${totalAmount.toFixed(2)} (${totalPoints} points). Update your payment method to avoid being blocked.`,
+                            type: 'payment_failed',
+                            data: {
+                                amount: totalAmount,
+                                points: totalPoints,
+                                error: errorMessage,
+                            },
+                        });
+                    } catch (notifyErr) {
+                        console.error('Payment failed notification error:', notifyErr.message);
+                    }
+
                     results.failed++;
                     results.errors.push({
                         merchantId: merchant.id,

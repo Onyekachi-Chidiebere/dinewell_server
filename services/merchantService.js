@@ -352,6 +352,19 @@ async function approveRestaurant(restaurantId) {
     date_approved: new Date(),
   });
 
+  try {
+    const notificationService = require('./notificationService');
+    await notificationService.createNotification({
+      userId: user.id,
+      title: 'Restaurant approved',
+      body: 'Your restaurant has been verified. You can now use the full DineWell merchant experience.',
+      type: 'restaurant_approved',
+      data: { restaurantId: user.id },
+    });
+  } catch (notifyErr) {
+    console.error('Approval notification error:', notifyErr.message);
+  }
+
   return {
     id: user.id,
     restaurant_name: user.restaurant_name,
@@ -382,6 +395,19 @@ async function disableRestaurant(restaurantId) {
     approval_status: APPROVAL.DISABLED,
     date_approved: null,
   });
+
+  try {
+    const notificationService = require('./notificationService');
+    await notificationService.createNotification({
+      userId: user.id,
+      title: 'Restaurant disabled',
+      body: 'Your restaurant account has been disabled by an admin. Contact support if you need help.',
+      type: 'restaurant_disabled',
+      data: { restaurantId: user.id },
+    });
+  } catch (notifyErr) {
+    console.error('Disable notification error:', notifyErr.message);
+  }
 
   return {
     id: user.id,

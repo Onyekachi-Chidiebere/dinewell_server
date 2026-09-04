@@ -133,7 +133,18 @@ User.init(
         },
         profile_image: {
             type: DataTypes.STRING(500)
-        }
+        },
+        // Notification preferences (Phase 1)
+        app_notifications: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+        },
+        email_notifications: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
 
     },
     {
@@ -158,6 +169,13 @@ User.associate = function(models) {
     foreignKey: 'customer_id',
     as: 'customerPoints'
   });
+
+  if (models.Notification) {
+    User.hasMany(models.Notification, {
+      foreignKey: 'user_id',
+      as: 'notifications',
+    });
+  }
 };
 
 module.exports = User;

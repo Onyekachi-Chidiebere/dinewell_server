@@ -14,6 +14,7 @@ const paymentController = require('./controllers/paymentController');
 const adminController = require('./controllers/adminController');
 const adminStatisticsController = require('./controllers/adminStatisticsController');
 const platformSettingsController = require('./controllers/platformSettingsController');
+const notificationController = require('./controllers/notificationController');
 const adminAuth = require('./utils/adminAuth');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
@@ -95,6 +96,16 @@ router.post('/points/scan/:qrCode', pointsController.scanQrCode);
 router.get('/points/admin/list', adminAuth, pointsController.getPointsForAdmin);
 router.get('/rate', pointsController.getPointsRate);
 router.get('/restaurants/:restaurantId/points/history', pointsController.getPointsHistoryForMerchant);
+
+// Notification preferences + inbox
+router.get('/users/:userId/notification-preferences', notificationController.getPreferences);
+router.put('/users/:userId/notification-preferences', notificationController.updatePreferences);
+router.get('/users/:userId/notifications', notificationController.listNotifications);
+router.get('/users/:userId/notifications/unread-count', notificationController.getUnreadCount);
+router.patch('/users/:userId/notifications/read-all', notificationController.markAllAsRead);
+router.patch('/users/:userId/notifications/:notificationId/read', notificationController.markAsRead);
+router.post('/users/:userId/device-tokens', notificationController.registerDeviceToken);
+router.delete('/users/:userId/device-tokens', notificationController.removeDeviceToken);
 
 // Payment management routes
 router.get('/restaurants/:restaurantId/payments/history', paymentController.getPaymentHistory);

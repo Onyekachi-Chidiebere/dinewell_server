@@ -210,8 +210,11 @@ exports.scanQrCode = async (req, res) => {
 
         // Issue the points
         const result = await pointsService.issuePoints(pointsResult.points.id, customerId);
+        const pointsRecord = result.points || pointsResult.points;
+        const pointType = pointsRecord.type;
+        const totalPoints = pointsRecord.total_points;
 
-        // Notify merchant directly via stored socket id
+        // Notify merchant directly via stored socket id (existing realtime UX — keep intact)
         try {
             const io = req.app.get('io');
             if (io) {
@@ -222,7 +225,7 @@ exports.scanQrCode = async (req, res) => {
                     io.to(restaurantSocket.socket_id).emit('points:completed', {
                         pointsId: pointsResult.points.id,
                         restaurantId: restaurantUserId,
-                        type: pointsResult.points.type,
+                        type: pointType,
                         qrCode: pointsResult.points.qr_code,
                         customerId: customerId || null,
                         status: 'issued',
@@ -232,6 +235,48 @@ exports.scanQrCode = async (req, res) => {
             }
         } catch (emitErr) {
             console.error('Socket emit error:', emitErr);
+        }
+
+        // In-app inbox notifications (additive — does not replace socket)
+        try {
+            const notificationService = require('../services/notificationService');
+            const restaurantId = pointsResult.points.restaurant_id;
+
+            if (restaurantId) {
+                await notificationService.createNotification({
+                    userId: restaurantId,
+                    title: pointType === 'redeem' ? 'Points redeemed' : 'Points issued',
+                    body:
+                        pointType === 'redeem'
+                            ? `A customer redeemed ${totalPoints} points at your restaurant.`
+                            : `A customer earned ${totalPoints} points at your restaurant.`,
+                    type: 'points_completed',
+                    data: {
+                        pointsId: pointsResult.points.id,
+                        type: pointType,
+                        customerId: customerId || null,
+                    },
+                });
+            }
+
+            if (customerId) {
+                await notificationService.createNotification({
+                    userId: customerId,
+                    title: pointType === 'redeem' ? 'Points redeemed' : 'Points earned',
+                    body:
+                        pointType === 'redeem'
+                            ? `You redeemed ${totalPoints} points.`
+                            : `You earned ${totalPoints} points.`,
+                    type: 'points_completed',
+                    data: {
+                        pointsId: pointsResult.points.id,
+                        type: pointType,
+                        restaurantId,
+                    },
+                });
+            }
+        } catch (notifyErr) {
+            console.error('Points inbox notification error:', notifyErr);
         }
 
         res.json(result);

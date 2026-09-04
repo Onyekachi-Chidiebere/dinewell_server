@@ -20,6 +20,12 @@ function normalizeSettings(row) {
   };
 }
 
+function parseIncomingNumber(value) {
+  if (value === null || value === undefined || value === '') return NaN;
+  if (typeof value === 'number') return value;
+  return Number(String(value).trim().replace(',', '.'));
+}
+
 async function ensureSettings() {
   let row = await PlatformSettings.findByPk(1);
   if (!row) {
@@ -50,27 +56,35 @@ async function updateSettings(updates = {}) {
   const next = {
     customer_earn_rate:
       updates.customerEarnRate !== undefined
-        ? Number(updates.customerEarnRate)
+        ? parseIncomingNumber(updates.customerEarnRate)
         : Number(row.customer_earn_rate),
     customer_redeem_rate:
       updates.customerRedeemRate !== undefined
-        ? Number(updates.customerRedeemRate)
+        ? parseIncomingNumber(updates.customerRedeemRate)
         : Number(row.customer_redeem_rate),
     merchant_billing_rate:
       updates.merchantBillingRate !== undefined
-        ? Number(updates.merchantBillingRate)
+        ? parseIncomingNumber(updates.merchantBillingRate)
         : Number(row.merchant_billing_rate),
     debt_limit_usd:
       updates.debtLimitUsd !== undefined
-        ? Number(updates.debtLimitUsd)
+        ? parseIncomingNumber(updates.debtLimitUsd)
         : Number(row.debt_limit_usd),
     updated_at: new Date(),
   };
 
-  if (next.customer_earn_rate <= 0) throw new Error('Customer earn rate must be greater than 0');
-  if (next.customer_redeem_rate <= 0) throw new Error('Customer redeem rate must be greater than 0');
-  if (next.merchant_billing_rate < 0) throw new Error('Merchant billing rate cannot be negative');
-  if (next.debt_limit_usd < 0) throw new Error('Debt limit cannot be negative');
+  if (Number.isNaN(next.customer_earn_rate) || next.customer_earn_rate <= 0) {
+    throw new Error('Customer earn rate must be greater than 0');
+  }
+  if (Number.isNaN(next.customer_redeem_rate) || next.customer_redeem_rate <= 0) {
+    throw new Error('Customer redeem rate must be greater than 0');
+  }
+  if (Number.isNaN(next.merchant_billing_rate) || next.merchant_billing_rate < 0) {
+    throw new Error('Merchant billing rate cannot be negative');
+  }
+  if (Number.isNaN(next.debt_limit_usd) || next.debt_limit_usd < 0) {
+    throw new Error('Debt limit cannot be negative');
+  }
 
   await row.update(next);
 
@@ -129,6 +143,7 @@ async function refreshRestaurantBillingStatus(restaurantId, { clearPaymentFailed
   }
 
   const debt = await getRestaurantDebt(restaurantId);
+  const wasBlocked = !!merchant.points_blocked;
   const updates = {
     points_blocked: debt.overLimit,
   };
@@ -138,6 +153,25 @@ async function refreshRestaurantBillingStatus(restaurantId, { clearPaymentFailed
   }
 
   await merchant.update(updates);
+
+  // Notify when newly blocked by debt limit
+  if (!wasBlocked && debt.overLimit) {
+    try {
+      const notificationService = require('./notificationService');
+      await notificationService.createNotification({
+        userId: restaurantId,
+        title: 'Point generation blocked',
+        body: `Your unpaid balance ($${debt.owedUsd.toFixed(2)}) has reached the limit of $${debt.debtLimitUsd.toFixed(2)}. Add or update your payment method to continue issuing and redeeming points.`,
+        type: 'points_blocked',
+        data: {
+          owedUsd: debt.owedUsd,
+          debtLimitUsd: debt.debtLimitUsd,
+        },
+      });
+    } catch (notifyErr) {
+      console.error('Points blocked notification error:', notifyErr.message);
+    }
+  }
 
   return {
     ...debt,

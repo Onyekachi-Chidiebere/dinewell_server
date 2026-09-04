@@ -11,6 +11,8 @@ const Points = require('./models/points'); // ✅ keep consistent plural name
 const Payment = require('./models/payments');
 const Socket = require('./models/socket');
 const PlatformSettings = require('./models/platformSettings');
+const Notification = require('./models/notification');
+const DeviceToken = require('./models/deviceToken');
 const cron = require('node-cron');
 const paymentService = require('./services/paymentService');
 const platformSettingsService = require('./services/platformSettingsService');
@@ -64,7 +66,7 @@ app.use('/', router);
 dbConnection();
 
 // ✅ Initialize associations manually
-const models = { User, Points, Dish, Payment, Socket, PlatformSettings };
+const models = { User, Points, Dish, Payment, Socket, PlatformSettings, Notification, DeviceToken };
 
 Object.values(models).forEach((model) => {
   if (model.associate) {
@@ -80,6 +82,8 @@ Promise.all([
   Payment.sync({ alter: true }),
   Socket.sync({ alter: true }),
   PlatformSettings.sync({ alter: true }),
+  Notification.sync({ alter: true }),
+  DeviceToken.sync({ alter: true }),
 ]).then(() => {
   // Sync Points after Payment is created
   return Points.sync({ alter: true });
