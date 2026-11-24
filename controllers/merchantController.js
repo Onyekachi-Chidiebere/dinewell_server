@@ -1,11 +1,14 @@
 const merchantService = require('../services/merchantService');
 const { generateOTP, storeOTP, verifyOTP, isEmailVerified, removeVerificationToken } = require('../utils/otpService');
 const { sendOTPEmail } = require('../utils/emailService');
+const { issueSignupToken } = require('../middleware/signupAuth');
+const { issueTokenPair } = require('../services/authService');
+const User = require('../models/user');
 
 exports.signupDetails = async (req, res) => {
   try {
     const result = await merchantService.saveDetails(req.body);
-    res.json(result);
+    res.json({ ...result, signupToken: issueSignupToken(result.merchantId) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -14,7 +17,11 @@ exports.signupDetails = async (req, res) => {
 exports.signupAddress = async (req, res) => {
   try {
     await merchantService.saveAddress(req.body);
-    res.json({ success: true, nextScreen: 'RestaurantPictures' });
+    res.json({
+      success: true,
+      nextScreen: 'RestaurantPictures',
+      signupToken: issueSignupToken(req.signup.merchantId),
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -35,17 +42,10 @@ function fileFromBase64(part, fallbackName) {
 exports.signupPictures = async (req, res) => {
   try {
     // Multer puts text fields on req.body; also accept query as fallback
-    const merchantId = req.body?.merchantId || req.query?.merchantId;
-    console.log('signupPictures body keys:', Object.keys(req.body || {}), {
-      merchantId,
-      logoCount: req.files?.logo?.length || 0,
-      imageCount: req.files?.restaurantImages?.length || 0,
-    });
+    const merchantId = req.signup?.merchantId || req.body?.merchantId || req.query?.merchantId;
     if (!merchantId) {
       return res.status(400).json({
         error: 'merchantId is required',
-        receivedBodyKeys: Object.keys(req.body || {}),
-        hasFiles: !!req.files,
       });
     }
     const logo = req.files && req.files.logo ? req.files.logo[0] : null;
@@ -59,7 +59,7 @@ exports.signupPictures = async (req, res) => {
       logo: validLogo,
       restaurantImages: validImages,
     });
-    res.json({ success: true, nextScreen: 'Login' });
+    res.json({ success: true, nextScreen: 'Login', signupToken: issueSignupToken(merchantId) });
   } catch (err) {
     console.error('signupPictures error:', err);
     res.status(400).json({ error: err.message || 'Failed to upload pictures' });
@@ -72,14 +72,8 @@ exports.signupPictures = async (req, res) => {
  */
 exports.signupPicturesBase64 = async (req, res) => {
   try {
-    const started = Date.now();
-    const { merchantId, logo, restaurantImages } = req.body || {};
-    console.log('[signupPicturesBase64] incoming', {
-      merchantId,
-      hasLogo: !!logo?.base64,
-      imageCount: Array.isArray(restaurantImages) ? restaurantImages.length : 0,
-      contentLength: req.headers['content-length'],
-    });
+    const { logo, restaurantImages } = req.body || {};
+    const merchantId = req.signup?.merchantId || req.body?.merchantId;
     if (!merchantId) {
       return res.status(400).json({ error: 'merchantId is required' });
     }
@@ -97,8 +91,7 @@ exports.signupPicturesBase64 = async (req, res) => {
       logo: validLogo,
       restaurantImages: validImages,
     });
-    console.log('[signupPicturesBase64] ok', { ms: Date.now() - started });
-    res.json({ success: true, nextScreen: 'Login' });
+    res.json({ success: true, nextScreen: 'Login', signupToken: issueSignupToken(merchantId) });
   } catch (err) {
     console.error('signupPicturesBase64 error:', err);
     res.status(400).json({ error: err.message || 'Failed to upload pictures' });
@@ -107,12 +100,12 @@ exports.signupPicturesBase64 = async (req, res) => {
 
 exports.completeSignup = async (req, res) => {
   try {
-    const { merchantId } = req.body;
+    const merchantId = req.signup?.merchantId || req.body.merchantId;
     if (!merchantId) {
       return res.status(400).json({ error: 'merchantId is required' });
     }
     const progress = await merchantService.completeSignup({ merchantId });
-    res.json({ success: true, ...progress, nextScreen: 'Login' });
+    res.json({ success: true, ...progress, nextScreen: 'Login', signupToken: issueSignupToken(merchantId) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -120,7 +113,8 @@ exports.completeSignup = async (req, res) => {
 
 exports.getSignupProgress = async (req, res) => {
   try {
-    const { email, merchantId } = req.query;
+    const email = req.query.email;
+    const merchantId = req.signup?.merchantId || req.query.merchantId;
     if (!email && !merchantId) {
       return res.status(400).json({ error: 'email or merchantId is required' });
     }
@@ -128,7 +122,7 @@ exports.getSignupProgress = async (req, res) => {
     if (!progress) {
       return res.json({ found: false });
     }
-    res.json({ found: true, ...progress });
+    res.json({ found: true, ...progress, signupToken: issueSignupToken(progress.merchantId) });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -146,6 +140,7 @@ exports.signupCard = (req, res) => {
 exports.login = async (req, res) => {
   try {
     const merchant = await merchantService.login(req.body);
+    const tokens = await issueTokenPair(await User.findByPk(merchant.id));
     res.json({
       id: merchant.id,
       restaurant_name: merchant.restaurant_name,
@@ -158,6 +153,7 @@ exports.login = async (req, res) => {
       profile_image: merchant.profile_image || null,
       approval_status: merchant.approval_status,
       approvalStatus: merchant.approvalStatus,
+      ...tokens,
     });
   } catch (err) {
     if (err.code === 'SIGNUP_INCOMPLETE' && err.signupProgress) {
@@ -165,6 +161,7 @@ exports.login = async (req, res) => {
         error: err.message,
         code: 'SIGNUP_INCOMPLETE',
         signupProgress: err.signupProgress,
+        signupToken: issueSignupToken(err.signupProgress.merchantId),
       });
     }
     res.status(400).json({ error: err.message });
@@ -223,18 +220,6 @@ exports.updateMerchantProfile = async (req, res) => {
     const { userId } = req.params;
     const { name, email, phone, restaurantName, dateOfBirth, gender } = req.body;
     const profileImageFile = req.file; // Multer will attach the file here
-
-    console.log('Update profile request:', {
-      userId,
-      body: req.body,
-      file: profileImageFile ? {
-        fieldname: profileImageFile.fieldname,
-        originalname: profileImageFile.originalname,
-        mimetype: profileImageFile.mimetype,
-        size: profileImageFile.size,
-        hasBuffer: !!profileImageFile.buffer
-      } : 'No file received'
-    });
 
     const merchant = await merchantService.updateMerchantProfile({
       userId,

@@ -39,8 +39,9 @@ async function ensureCustomer(user) {
 }
 
 async function addCard({ userId, paymentMethodId }) {
-  const user = await User.findByPk(userId);
-  if (!user) throw new Error('User not found');
+  if (!paymentMethodId || !String(paymentMethodId).startsWith('pm_')) throw new Error('Valid Stripe PaymentMethod ID required');
+  const user = await User.findOne({ where: { id: userId, type: 'Merchant' } });
+  if (!user) throw new Error('Merchant not found');
   const customerId = await ensureCustomer(user);
 
   // Attach payment method
@@ -71,9 +72,11 @@ async function addCard({ userId, paymentMethodId }) {
 }
 
 async function setDefaultCard({ userId, paymentMethodId }) {
-  const user = await User.findByPk(userId);
-  if (!user) throw new Error('User not found');
+  const user = await User.findOne({ where: { id: userId, type: 'Merchant' } });
+  if (!user) throw new Error('Merchant not found');
   const customerId = await ensureCustomer(user);
+  const pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+  if (pm.customer !== customerId) throw new Error('PaymentMethod does not belong to this merchant');
 
   await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethodId } });
 
@@ -81,15 +84,17 @@ async function setDefaultCard({ userId, paymentMethodId }) {
   return { success: true };
 }
 
-async function charge({ userId, amount, currency = 'usd', paymentMethodId }) {
-  const user = await User.findByPk(userId);
-  if (!user) throw new Error('User not found');
+async function charge({ userId, amount, currency = 'usd', paymentMethodId, idempotencyKey }) {
+  const user = await User.findOne({ where: { id: userId, type: 'Merchant' } });
+  if (!user) throw new Error('Merchant not found');
   const customerId = await ensureCustomer(user);
 
   // If no payment method provided, use default
   const pm = paymentMethodId || user.default_payment_card_id;
   if (!pm) throw new Error('No payment method specified');
 
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) throw new Error('Invalid server-calculated charge amount');
+  if (!idempotencyKey) throw new Error('Idempotency key required');
   const paymentIntent = await stripe.paymentIntents.create({
     amount: Math.round(Number(amount) * 100),
     currency,
@@ -97,14 +102,14 @@ async function charge({ userId, amount, currency = 'usd', paymentMethodId }) {
     payment_method: pm,
     confirm: true,
     off_session: true,
-  });
+  }, { idempotencyKey });
 
   return paymentIntent;
 }
 
 async function listCards({ userId }) {
-  const user = await User.findByPk(userId);
-  if (!user) throw new Error('User not found');
+  const user = await User.findOne({ where: { id: userId, type: 'Merchant' } });
+  if (!user) throw new Error('Merchant not found');
   const customerId = await ensureCustomer(user);
   const customer = await stripe.customers.retrieve(customerId);
 

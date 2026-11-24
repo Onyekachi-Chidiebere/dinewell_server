@@ -223,6 +223,7 @@ exports.scanQrCode = async (req, res) => {
               
                 if (restaurantSocket && restaurantSocket.socket_id) {
                     io.to(restaurantSocket.socket_id).emit('points:completed', {
+                        transactionId: pointsResult.points.id,
                         pointsId: pointsResult.points.id,
                         restaurantId: restaurantUserId,
                         type: pointType,
@@ -279,7 +280,10 @@ exports.scanQrCode = async (req, res) => {
             console.error('Points inbox notification error:', notifyErr);
         }
 
-        res.json(result);
+        res.json({
+            ...result,
+            transactionId: pointsResult.points.id,
+        });
     } catch (err) {
         console.error('Scan QR code error:', err);
         res.status(400).json({ 

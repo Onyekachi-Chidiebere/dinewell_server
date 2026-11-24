@@ -60,7 +60,7 @@ async function adminLogin({ email, password }) {
     }
 
     // Generate tokens
-    const tokens = generateToken({
+    const tokens = await generateToken({
       id: admin.id,
       email: admin.email,
       type: admin.type,

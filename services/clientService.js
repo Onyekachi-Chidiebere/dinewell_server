@@ -33,7 +33,6 @@ async function generateUniqueUsername(baseUsername) {
 // Create a new client account with token verification or email/password
 async function createClient({ email, username, name, dateOfBirth, gender, provider, idToken, profileImage, password }) {
   try {
-    console.log('create client',{ email, username, name, dateOfBirth, gender, provider, idToken, profileImage, hasPassword: !!password })
     let verifiedUserInfo = {};
     let providerId = '';
     let hashedPassword = null;
@@ -116,14 +115,13 @@ async function createClient({ email, username, name, dateOfBirth, gender, provid
       type: user.type,
     };
   } catch (error) {
-    console.log({error, message:'failed to create'})
+    console.error('Failed to create client:', error.message);
     throw new Error(`Failed to create client: ${error.message}`);
   }
 }
 
 // Sign in client with social provider and token verification or email/password
 async function signInClient({ email, provider, idToken, password }) {
-  console.log('sign in client',{ email, provider, idToken, hasPassword: !!password })
   try {
     // Email/password authentication
     if (provider === 'email' && password) {
@@ -204,7 +202,7 @@ async function signInClient({ email, provider, idToken, password }) {
       type: user.type,
     };
   } catch (error) {
-    console.log({error, message:'failed to sign in'})
+    console.error('Failed to sign in client:', error.message);
     throw new Error(`${error.message}`);
   }
 }

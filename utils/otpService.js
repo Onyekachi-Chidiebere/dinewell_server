@@ -1,19 +1,20 @@
-// In-memory storage for OTPs
-// In production, consider using Redis or a database
-const otpStore = new Map();
-const verifiedEmails = new Map(); // Store verified emails with expiration
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
+const OtpChallenge = require('../models/otpChallenge');
+const { hash } = require('../services/authService');
+const { sequelize } = require('./db-connection');
 
-// OTP expiration time: 10 minutes
-const OTP_EXPIRY_TIME = 10 * 60 * 1000; // 10 minutes in milliseconds
-// Verification token expiration: 15 minutes (allows time to reset password after OTP verification)
-const VERIFICATION_TOKEN_EXPIRY = 15 * 60 * 1000; // 15 minutes in milliseconds
+const OTP_EXPIRY_TIME = 10 * 60 * 1000;
+const RESET_EXPIRY_TIME = 15 * 60 * 1000;
+const MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
 
 /**
  * Generate a random 5-digit OTP
  * @returns {string} - 5-digit OTP
  */
 function generateOTP() {
-  return Math.floor(10000 + Math.random() * 90000).toString();
+  return crypto.randomInt(10000, 100000).toString();
 }
 
 /**
@@ -21,16 +22,18 @@ function generateOTP() {
  * @param {string} email - Email address
  * @param {string} otp - OTP code
  */
-function storeOTP(email, otp) {
-  const expiryTime = Date.now() + OTP_EXPIRY_TIME;
-  otpStore.set(email.toLowerCase(), {
-    otp,
-    expiryTime,
-    createdAt: Date.now(),
+async function storeOTP(email, otp, { userId, accountType }) {
+  await OtpChallenge.destroy({
+    where: { email: email.toLowerCase(), account_type: accountType, purpose: 'password_reset' },
   });
-
-  // Clean up expired OTPs periodically
-  cleanupExpiredOTPs();
+  return OtpChallenge.create({
+    id: uuidv4(),
+    user_id: userId,
+    email: email.toLowerCase(),
+    account_type: accountType,
+    otp_hash: hash(otp),
+    expires_at: new Date(Date.now() + OTP_EXPIRY_TIME),
+  });
 }
 
 /**
@@ -39,41 +42,34 @@ function storeOTP(email, otp) {
  * @param {string} otp - OTP code to verify
  * @returns {boolean} - True if OTP is valid, false otherwise
  */
-function verifyOTP(email, otp) {
-  const emailKey = email.toLowerCase();
-  const storedData = otpStore.get(emailKey);
-
-  if (!storedData) {
-    console.log('No OTP found for this mail')
-    return false; // No OTP found for this email
-  }
-
-  // Check if OTP has expired
-  if (Date.now() > storedData.expiryTime) {
-    console.log('OTP has expired')
-    otpStore.delete(emailKey); // Remove expired OTP
-    return false;
-  }
-
-  // Verify OTP matches
-  if (storedData.otp !== otp) {
-    console.log('OTP doesnt match')
-    return false; // OTP doesn't match
-  }
-
-  // OTP is valid - remove it after verification (one-time use)
-  otpStore.delete(emailKey);
-  
-  // Store verification token for password reset (expires in 15 minutes)
-  const verificationExpiry = Date.now() + VERIFICATION_TOKEN_EXPIRY;
-  verifiedEmails.set(emailKey, {
-    verified: true,
-    expiryTime: verificationExpiry,
-    verifiedAt: Date.now()
+async function verifyOTP(email, otp, accountType) {
+  const challenge = await OtpChallenge.findOne({
+    where: {
+      email: email.toLowerCase(),
+      account_type: accountType,
+      purpose: 'password_reset',
+      consumed_at: null,
+    },
+    order: [['created_at', 'DESC']],
   });
-  
-  console.log('OTP verification successful')
-  return true;
+  if (!challenge || challenge.expires_at <= new Date() || challenge.attempts >= MAX_ATTEMPTS) return null;
+  if (challenge.otp_hash !== hash(String(otp))) {
+    await challenge.increment('attempts');
+    return null;
+  }
+  const jti = uuidv4();
+  const resetToken = jwt.sign({
+    sub: String(challenge.user_id),
+    email: challenge.email,
+    type: challenge.account_type,
+    tokenType: 'password-reset',
+    jti,
+  }, process.env.RESET_TOKEN_SECRET || process.env.JSON_WEB_SECRET, {
+    expiresIn: '15m',
+    issuer: 'dinewell',
+  });
+  await challenge.update({ consumed_at: new Date(), reset_jti_hash: hash(jti) });
+  return { resetToken, userId: challenge.user_id, email: challenge.email };
 }
 
 /**
@@ -81,86 +77,47 @@ function verifyOTP(email, otp) {
  * @param {string} email - Email address
  * @returns {boolean} - True if valid OTP exists
  */
-function hasValidOTP(email) {
-  const emailKey = email.toLowerCase();
-  const storedData = otpStore.get(emailKey);
+async function consumeResetToken(resetToken, expectedType) {
+  const decoded = decodeResetToken(resetToken, expectedType);
+  if (!decoded) return null;
+  return sequelize.transaction(async (transaction) => {
+    const challenge = await OtpChallenge.findOne({
+      where: {
+        user_id: Number(decoded.sub),
+        email: decoded.email,
+        account_type: expectedType,
+        reset_jti_hash: hash(decoded.jti),
+      },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (!challenge) return null;
+    const result = { userId: Number(decoded.sub), email: decoded.email };
+    await challenge.update({ reset_jti_hash: null }, { transaction });
+    return result;
+  });
+}
 
-  if (!storedData) {
-    return false;
+function decodeResetToken(resetToken, expectedType) {
+  try {
+    const decoded = jwt.verify(resetToken, process.env.RESET_TOKEN_SECRET || process.env.JSON_WEB_SECRET, {
+      issuer: 'dinewell',
+    });
+    if (decoded.tokenType !== 'password-reset' || decoded.type !== expectedType) return null;
+    return decoded;
+  } catch (_) {
+    return null;
   }
-
-  if (Date.now() > storedData.expiryTime) {
-    otpStore.delete(emailKey);
-    return false;
-  }
-
-  return true;
 }
 
 /**
  * Remove OTP for an email
  * @param {string} email - Email address
  */
-function removeOTP(email) {
-  otpStore.delete(email.toLowerCase());
-}
-
-/**
- * Check if email was verified (OTP was successfully verified)
- * @param {string} email - Email address
- * @returns {boolean} - True if email was verified and token is still valid
- */
-function isEmailVerified(email) {
-  const emailKey = email.toLowerCase();
-  const verificationData = verifiedEmails.get(emailKey);
-
-  if (!verificationData) {
-    return false;
-  }
-
-  // Check if verification token has expired
-  if (Date.now() > verificationData.expiryTime) {
-    verifiedEmails.delete(emailKey);
-    return false;
-  }
-
-  return true;
-}
-
-/**
- * Remove verification token (after password reset is complete)
- * @param {string} email - Email address
- */
-function removeVerificationToken(email) {
-  verifiedEmails.delete(email.toLowerCase());
-}
-
-/**
- * Clean up expired OTPs and verification tokens from storage
- */
-function cleanupExpiredOTPs() {
-  const now = Date.now();
-  for (const [email, data] of otpStore.entries()) {
-    if (now > data.expiryTime) {
-      otpStore.delete(email);
-    }
-  }
-  for (const [email, data] of verifiedEmails.entries()) {
-    if (now > data.expiryTime) {
-      verifiedEmails.delete(email);
-    }
-  }
-}
-
-// Clean up expired OTPs every 5 minutes
-setInterval(cleanupExpiredOTPs, 5 * 60 * 1000);
-
 module.exports = {
   generateOTP,
   storeOTP,
   verifyOTP,
-  hasValidOTP,
-  removeOTP,
-  isEmailVerified,
-  removeVerificationToken,
+  consumeResetToken,
+  decodeResetToken,
 };

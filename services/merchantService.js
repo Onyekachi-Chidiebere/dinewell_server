@@ -271,12 +271,8 @@ async function getSignupProgress({ email, merchantId }) {
   return buildSignupProgress(user);
 }
 
-async function saveCard({ merchantId, cardNumber, expiry, cvv }) {
-  const user = await User.findByPk(merchantId);
-  if (!user) throw new Error('Merchant not found');
-  const payment_cards = Array.isArray(user.payment_cards) ? [...user.payment_cards] : [];
-  payment_cards.push({ cardNumber, expiry, cvv }); // demo only; do NOT store raw data in prod
-  await user.update({ payment_cards });
+async function saveCard() {
+  throw new Error('Raw card data is not accepted; use a Stripe PaymentMethod ID');
 }
 
 async function login({ email, password }) {

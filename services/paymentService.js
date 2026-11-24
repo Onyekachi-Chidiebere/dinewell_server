@@ -4,12 +4,14 @@ const User = require('../models/user');
 const cardService = require('./cardService');
 const platformSettingsService = require('./platformSettingsService');
 const { Op, fn, col } = require('sequelize');
+const { sequelize } = require('../utils/db-connection');
+const crypto = require('crypto');
 
 /**
  * Calculate and charge restaurants for unpaid points issued.
  * Runs daily; also callable manually by admin.
  */
-async function processDailyPayments() {
+async function processDailyPaymentsUnlocked() {
     try {
         console.log('Starting daily payment processing...');
 
@@ -85,6 +87,14 @@ async function processDailyPayments() {
                 let paymentStatus = 'pending';
                 let stripePaymentIntentId = null;
                 let errorMessage = null;
+                const pointIds = unpaidPoints.map((p) => p.id).sort((a, b) => a - b);
+                const idempotencyKey = `daily:${merchant.id}:${crypto
+                    .createHash('sha256')
+                    .update(pointIds.join(','))
+                    .digest('hex')}`;
+
+                const existingPayment = await Payment.findOne({ where: { idempotency_key: idempotencyKey } });
+                if (existingPayment) continue;
 
                 try {
                     const paymentIntent = await cardService.charge({
@@ -92,9 +102,10 @@ async function processDailyPayments() {
                         amount: totalAmount,
                         currency: 'usd',
                         paymentMethodId: merchant.default_payment_card_id,
+                        idempotencyKey,
                     });
-                    paymentStatus = 'completed';
                     stripePaymentIntentId = paymentIntent.id;
+                    paymentStatus = paymentIntent.status === 'succeeded' ? 'completed' : 'pending';
                 } catch (chargeError) {
                     console.error(
                         `Failed to charge merchant ${merchant.id}:`,
@@ -104,34 +115,40 @@ async function processDailyPayments() {
                     errorMessage = chargeError.message;
                 }
 
-                const payment = await Payment.create({
-                    restaurant_id: merchant.id,
-                    restaurant_name: merchant.restaurant_name,
-                    amount: totalAmount,
-                    points_issued: totalPoints,
-                    payment_status: paymentStatus,
-                    payment_date: new Date(),
-                    stripe_payment_intent_id: stripePaymentIntentId,
-                    points_ids: unpaidPoints.map((p) => p.id),
-                    type: 'debit',
-                    description:
-                        paymentStatus === 'completed'
+                let payment;
+                await sequelize.transaction(async (transaction) => {
+                    payment = await Payment.create({
+                        restaurant_id: merchant.id,
+                        restaurant_name: merchant.restaurant_name,
+                        amount: totalAmount,
+                        points_issued: totalPoints,
+                        payment_status: paymentStatus,
+                        payment_date: new Date(),
+                        stripe_payment_intent_id: stripePaymentIntentId,
+                        points_ids: pointIds,
+                        type: 'debit',
+                        description: paymentStatus === 'completed'
                             ? `Payment for ${totalPoints} points issued`
                             : `Failed charge for ${totalPoints} points issued`,
-                    card_last4: cardLast4,
-                    card_brand: cardBrand,
-                    error_message: errorMessage,
+                        card_last4: cardLast4,
+                        card_brand: cardBrand,
+                        error_message: errorMessage,
+                        idempotency_key: idempotencyKey,
+                    }, { transaction });
+                    if (paymentStatus === 'completed') {
+                        await Points.update(
+                            { paid: true, payment_id: payment.id },
+                            { where: { id: { [Op.in]: pointIds }, paid: false }, transaction }
+                        );
+                    } else if (paymentStatus === 'failed') {
+                        await User.update(
+                            { payment_failed: true },
+                            { where: { id: merchant.id }, transaction }
+                        );
+                    }
                 });
 
                 if (paymentStatus === 'completed') {
-                    await Points.update(
-                        { paid: true, payment_id: payment.id },
-                        {
-                            where: {
-                                id: { [Op.in]: unpaidPoints.map((p) => p.id) },
-                            },
-                        }
-                    );
                     await platformSettingsService.refreshRestaurantBillingStatus(
                         merchant.id,
                         { clearPaymentFailed: true }
@@ -140,11 +157,7 @@ async function processDailyPayments() {
                     console.log(
                         `Successfully processed payment for merchant ${merchant.id}: $${totalAmount} for ${totalPoints} points`
                     );
-                } else {
-                    await User.update(
-                        { payment_failed: true },
-                        { where: { id: merchant.id } }
-                    );
+                } else if (paymentStatus === 'failed') {
                     await platformSettingsService.refreshRestaurantBillingStatus(
                         merchant.id
                     );
@@ -194,6 +207,25 @@ async function processDailyPayments() {
     } catch (error) {
         console.error('Error in daily payment processing:', error);
         throw error;
+    }
+}
+
+async function processDailyPayments() {
+    const connection = await sequelize.connectionManager.getConnection();
+    try {
+        const [lockResult] = await connection.query(
+            'SELECT pg_try_advisory_lock(348723948) AS acquired'
+        );
+        if (!lockResult.rows[0].acquired) {
+            return { skipped: true, reason: 'payment_job_already_running' };
+        }
+        return await processDailyPaymentsUnlocked();
+    } finally {
+        try {
+            await connection.query('SELECT pg_advisory_unlock(348723948)');
+        } finally {
+            await sequelize.connectionManager.releaseConnection(connection);
+        }
     }
 }
 

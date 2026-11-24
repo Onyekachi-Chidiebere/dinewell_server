@@ -3,8 +3,20 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "start": " yarn node index.js"
+    "start": "node index.js",
+    "migrate": "node migrations/run.js",
+    "migration:check": "node --test test/migrations.test.js",
+    "production:backup": "node scripts/production-backup.js",
+    "production:migrate": "node scripts/production-migrate.js",
+    "production:reset": "node scripts/production-reset.js",
+    "bootstrap:admin": "node scripts/bootstrap-admin.js",
+    "test": "node --test --test-concurrency=1",
+    "check": "node scripts/check-syntax.js",
+    "secrets:scan": "node scripts/scan-secrets.js"
   },
   "dependencies": {
     "axios": "^1.12.2",

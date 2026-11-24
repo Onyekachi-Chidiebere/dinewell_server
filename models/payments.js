@@ -75,6 +75,11 @@ Payment.init(
         error_message: {
             type: DataTypes.TEXT,
             allowNull: true
+        },
+        idempotency_key: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+            unique: true
         }
     },
     {

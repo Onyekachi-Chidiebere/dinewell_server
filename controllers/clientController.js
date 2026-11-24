@@ -1,6 +1,8 @@
 const clientService = require('../services/clientService');
 const { sendOTPEmail } = require('../utils/emailService');
 const { generateOTP, storeOTP, verifyOTP, isEmailVerified, removeVerificationToken } = require('../utils/otpService');
+const { issueTokenPair } = require('../services/authService');
+const User = require('../models/user');
 
 // Create new client account
 exports.createClient = async (req, res) => {
@@ -44,13 +46,15 @@ exports.createClient = async (req, res) => {
       password
     });
 
+    const tokens = await issueTokenPair(await User.findByPk(client.id));
     res.status(201).json({
       success: true,
       message: 'Client account created successfully',
-      client
+      client,
+      ...tokens,
     });
   } catch (err) {
-    console.log({err})
+    console.error('Client signup failed:', err.message);
     res.status(400).json({ 
       error: err.message 
     });
@@ -84,10 +88,12 @@ exports.signInClient = async (req, res) => {
       password
     });
 
+    const tokens = await issueTokenPair(await User.findByPk(client.id));
     res.json({
       success: true,
       message: 'Client signed in successfully',
-      client
+      client,
+      ...tokens,
     });
   } catch (err) {
     res.status(401).json({ 
@@ -102,18 +108,6 @@ exports.updateClientProfile = async (req, res) => {
     const { userId } = req.params;
     const { username, dateOfBirth, gender, name } = req.body;
     const profileImageFile = req.file; // Multer will attach the file here
-
-    console.log('Update profile request:', {
-      userId,
-      body: req.body,
-      file: profileImageFile ? {
-        fieldname: profileImageFile.fieldname,
-        originalname: profileImageFile.originalname,
-        mimetype: profileImageFile.mimetype,
-        size: profileImageFile.size,
-        hasBuffer: !!profileImageFile.buffer
-      } : 'No file received'
-    });
 
     const client = await clientService.updateClientProfile({
       userId,
@@ -130,7 +124,7 @@ exports.updateClientProfile = async (req, res) => {
       client
     });
   } catch (err) {
-    console.log({err})
+    console.error('Client update failed:', err.message);
     res.status(400).json({ 
       error: err.message 
     });
