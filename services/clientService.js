@@ -178,14 +178,28 @@ async function signInClient({ email, provider, idToken, password }) {
       throw new Error('Invalid provider. Only Google, Apple, and email are supported.');
     }
 
-    // Find user by provider ID and email
-    const user = await User.findOne({ 
-      where: { 
+    // Prefer exact provider_id match; fall back to email + provider for older accounts
+    let user = await User.findOne({
+      where: {
         email,
         provider,
-        provider_id: providerId 
-      } 
+        provider_id: providerId,
+        type: 'Customer',
+      },
     });
+
+    if (!user) {
+      user = await User.findOne({
+        where: {
+          email,
+          provider,
+          type: 'Customer',
+        },
+      });
+      if (user && providerId && user.provider_id !== providerId) {
+        await user.update({ provider_id: providerId });
+      }
+    }
 
     if (!user) {
       throw new Error('User not found or invalid credentials');
@@ -200,6 +214,7 @@ async function signInClient({ email, provider, idToken, password }) {
       gender: user.gender,
       profileImage: user.profile_image,
       type: user.type,
+      provider: user.provider,
     };
   } catch (error) {
     console.error('Failed to sign in client:', error.message);
