@@ -11,13 +11,17 @@ function issueSignupToken(merchantId) {
 }
 
 function requireSignupToken(req, res, next) {
+  // Do not fall back to Authorization Bearer — that is the session access token and
+  // fails JWT signup checks (and previously surfaced as "Valid signupToken required").
   const raw = req.headers['x-signup-token']
-    || (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
     || req.body?.signupToken
     || req.query?.signupToken;
   if (!raw && process.env.NODE_ENV !== 'production') {
     req.signup = { merchantId: Number(req.body?.merchantId || req.query?.merchantId) };
     return next();
+  }
+  if (!raw) {
+    return res.status(401).json({ error: 'Valid signupToken required' });
   }
   try {
     const decoded = jwt.verify(raw, process.env.SIGNUP_TOKEN_SECRET || process.env.JSON_WEB_SECRET, {
